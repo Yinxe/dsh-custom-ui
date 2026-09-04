@@ -20,18 +20,18 @@ window.__ModuleLoader__.load({
 .tg-groupTitle{display:flex;flex-direction:column;gap:2px}
 .tg-groupName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:600;line-height:20px}
 .tg-groupSub{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}
-.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px}
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:12px}
 .tg-card{display:flex;flex-direction:column;gap:8px;padding:10px;cursor:pointer;text-align:left;border-radius:12px;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);transition:border-color .15s,background .15s,transform .15s}
 .tg-card:hover{background:var(--dsw-alias-interactive-bg-hover);transform:translateY(-1px)}
 .tg-card:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
 .tg-card.tg-active{border:2px solid var(--dsw-alias-brand-primary)}
-.tg-canvas{display:block;width:100%;height:64px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);position:relative;overflow:hidden}
-.tg-canvasLabel{position:absolute;left:8px;bottom:6px;right:8px;display:flex;align-items:center;gap:6px}
-.tg-title{font-size:12.5px;font-weight:600;line-height:17px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-.tg-titleDark{color:rgba(20,20,22,.85);text-shadow:0 1px 1px rgba(255,255,255,.6)}
-.tg-badge{position:absolute;top:6px;right:6px;font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-brand-primary);color:#fff;white-space:nowrap}
+/* 卡片内：色块（渐变条）+ 名字 + 描述，纵向 */
+.tg-swatch{display:block;width:100%;height:36px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1)}
+.tg-nameRow{display:flex;align-items:center;gap:6px;min-height:18px}
+.tg-name{font-size:12.5px;font-weight:600;line-height:17px;color:var(--dsw-alias-label-primary)}
+.tg-badge{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-brand-primary);color:#fff;white-space:nowrap;flex:none}
 .tg-desc{font-size:11px;color:var(--dsw-alias-label-tertiary);line-height:15px}
-.tg-photoCard{background:conic-gradient(from 180deg,#f87171,#fbbf24,#4ade80,#38bdf8,#818cf8,#f472b6,#f87171)}
+.tg-photoSwatch{background:conic-gradient(from 180deg,#f87171,#fbbf24,#4ade80,#38bdf8,#818cf8,#f472b6,#f87171)}
 .tg-release{border:none;background:none;padding:0;font:inherit;font-size:12px;cursor:pointer;color:var(--dsw-alias-brand-primary)}
 .tg-release:hover{text-decoration:underline}
 .tg-release:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:2px}
@@ -191,14 +191,14 @@ window.__ModuleLoader__.load({
     /* ── 主题目录（与 lib/themes/index.js 的 THEME_CATALOG 同源）──
      * gradient：卡片渐变背景（QQ 调色盘观感）；group：分组归属。 */
     const THEMES = [
-      { id: 'opencode-terminal-dark', colorScheme: 'dark', tokens: opencodeDark, label: '暱夜终端', desc: '暖黑 + Apple 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#201d1d,#302c2c 60%,#007aff)', lightLabel: false },
-      { id: 'opencode-terminal-light', colorScheme: 'light', tokens: opencodeLight, label: '纸感终端', desc: '暖白 + 暖灰', group: '终端美学', gradient: 'linear-gradient(135deg,#fdfcfc,#f1eeee 60%,#e2dcdc)', lightLabel: true },
-      { id: 'github-dark', colorScheme: 'dark', tokens: githubDark, label: 'GitHub 暗色', desc: '#0d1117 + Primer 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#0d1117,#161b22 60%,#2f81f7)', lightLabel: false },
-      { id: 'github-light', colorScheme: 'light', tokens: githubLight, label: 'GitHub 亮色', desc: '纯白 + #0969da', group: '终端美学', gradient: 'linear-gradient(135deg,#ffffff,#f6f8fa 60%,#0969da)', lightLabel: true },
-      { id: 'linear-dark', colorScheme: 'dark', tokens: linearDark, label: 'Linear 无彩', desc: '近黑 + Indigo', group: '极简风物', gradient: 'linear-gradient(135deg,#08090a,#191a1b 55%,#5e6ad2)', lightLabel: false },
-      { id: 'notion-light', colorScheme: 'light', tokens: notionLight, label: 'Notion 暖白', desc: '纯白 + 暖灰', group: '极简风物', gradient: 'linear-gradient(135deg,#ffffff,#f6f5f4 55%,#e8e7e5)', lightLabel: true },
-      { id: 'claude-parchment-light', colorScheme: 'light', tokens: claudeLight, label: 'Claude 羊皮纸', desc: '羊皮纸 + 赤陶', group: '极简风物', gradient: 'linear-gradient(135deg,#f5f4ed,#faf9f5 55%,#c96442)', lightLabel: true },
-      { id: 'nvidia-dark', colorScheme: 'dark', tokens: nvidiaDark, label: 'NVIDIA 硬核', desc: '纯黑 + 信号绿', group: '极简风物', gradient: 'linear-gradient(135deg,#000000,#1a1a1a 55%,#76b900)', lightLabel: false }
+      { id: 'opencode-terminal-dark', colorScheme: 'dark', tokens: opencodeDark, label: '暱夜终端', desc: '暖黑 + Apple 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#201d1d,#302c2c 60%,#007aff)' },
+      { id: 'opencode-terminal-light', colorScheme: 'light', tokens: opencodeLight, label: '纸感终端', desc: '暖白 + 暖灰', group: '终端美学', gradient: 'linear-gradient(135deg,#fdfcfc,#f1eeee 60%,#e2dcdc)' },
+      { id: 'github-dark', colorScheme: 'dark', tokens: githubDark, label: 'GitHub 暗色', desc: '#0d1117 + Primer 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#0d1117,#161b22 60%,#2f81f7)' },
+      { id: 'github-light', colorScheme: 'light', tokens: githubLight, label: 'GitHub 亮色', desc: '纯白 + #0969da', group: '终端美学', gradient: 'linear-gradient(135deg,#ffffff,#f6f8fa 60%,#0969da)' },
+      { id: 'linear-dark', colorScheme: 'dark', tokens: linearDark, label: 'Linear 无彩', desc: '近黑 + Indigo', group: '极简风物', gradient: 'linear-gradient(135deg,#08090a,#191a1b 55%,#5e6ad2)' },
+      { id: 'notion-light', colorScheme: 'light', tokens: notionLight, label: 'Notion 暖白', desc: '纯白 + 暖灰', group: '极简风物', gradient: 'linear-gradient(135deg,#ffffff,#f6f5f4 55%,#e8e7e5)' },
+      { id: 'claude-parchment-light', colorScheme: 'light', tokens: claudeLight, label: 'Claude 羊皮纸', desc: '羊皮纸 + 赤陶', group: '极简风物', gradient: 'linear-gradient(135deg,#f5f4ed,#faf9f5 55%,#c96442)' },
+      { id: 'nvidia-dark', colorScheme: 'dark', tokens: nvidiaDark, label: 'NVIDIA 硬核', desc: '纯黑 + 信号绿', group: '极简风物', gradient: 'linear-gradient(135deg,#000000,#1a1a1a 55%,#76b900)' },
     ]
 
     /* 分组定义（QQ 调色盘式：组名 + 文艺副标题）。 */
@@ -462,17 +462,17 @@ window.__ModuleLoader__.load({
           })
         }
 
-        /* QQ 调色盘式分组卡片渲染 */
+        /* 卡片渲染：色块（渐变）+ 名字 + 描述，纵向排列 */
         const mkCard = (t, active, onPick) => {
           return React.createElement('button', {
             key: t.id,
             className: active ? 'tg-card tg-active' : 'tg-card',
             onClick: onPick
           },
-            React.createElement('div', { className: 'tg-canvas', style: { background: t.gradient || 'linear-gradient(135deg,#666,#888)' } },
-              active ? React.createElement('span', { className: 'tg-badge' }, '使用中') : null,
-              React.createElement('span', { className: 'tg-canvasLabel' },
-                React.createElement('span', { className: 'tg-title' + (t.lightLabel ? ' tg-titleDark' : '') }, t.label))),
+            React.createElement('span', { className: 'tg-swatch', style: { background: t.gradient || 'linear-gradient(135deg,#666,#888)' } }),
+            React.createElement('span', { className: 'tg-nameRow' },
+              React.createElement('span', { className: 'tg-name' }, t.label),
+              active ? React.createElement('span', { className: 'tg-badge' }, '使用中') : null),
             React.createElement('span', { className: 'tg-desc' }, t.desc))
         }
 
@@ -518,15 +518,15 @@ window.__ModuleLoader__.load({
           React.createElement('div', { className: 'tg-grid' },
             photoTheme || photoActive
               ? mkCard(
-                { id: PHOTO_ID, label: photoTheme ? '主色 ' + photoTheme.palette.accent : '我的取色主题', desc: '图片提取的专属配色', gradient: photoTheme ? 'linear-gradient(135deg,' + photoTheme.palette.companionB + ',' + photoTheme.palette.accent + ' 55%,' + photoTheme.palette.companionA + ')' : 'linear-gradient(135deg,#f472b6,#38bdf8)', lightLabel: false },
+                { id: PHOTO_ID, label: photoTheme ? '主色 ' + photoTheme.palette.accent : '我的取色主题', desc: '图片提取的专属配色', gradient: photoTheme ? 'linear-gradient(135deg,' + photoTheme.palette.companionB + ',' + photoTheme.palette.accent + ' 55%,' + photoTheme.palette.companionA + ')' : 'linear-gradient(135deg,#f472b6,#38bdf8)' },
                 photoActive,
                 function () { desiredId = PHOTO_ID; applyChoice(PHOTO_ID); bridge.saveTheme(PHOTO_ID).catch(function () {}) })
               : null,
             React.createElement('label', { key: 'photo-upload', className: 'tg-card', style: { cursor: 'pointer' } },
-              React.createElement('div', { className: 'tg-canvas tg-photoCard' },
-                React.createElement('span', { className: 'tg-canvasLabel' },
-                  React.createElement('span', { className: 'tg-title' }, photoBusy ? '取色中…' : '上传图片取色'))),
-              React.createElement('span', { className: 'tg-desc' }, '支持 png/jpg/webp，本地采样不上传'),
+              React.createElement('span', { className: 'tg-swatch tg-photoSwatch' }),
+              React.createElement('span', { className: 'tg-nameRow' },
+                React.createElement('span', { className: 'tg-name' }, photoBusy ? '取色中…' : '上传图片取色')),
+              React.createElement('span', { className: 'tg-desc' }, 'png/jpg/webp，本地采样不上传'),
               React.createElement('input', {
                 type: 'file', accept: '.png,.jpg,.jpeg,.webp',
                 style: { display: 'none' }, disabled: photoBusy,
@@ -704,7 +704,11 @@ window.__ModuleLoader__.load({
       }, 'custom-ui: settings section')
     }
 
-    /* ── 全局圆角：独立于背景能力保留。-1 跟随主题；0 全锐角；N 统一圆润。 ── */
+    /* ── 全局圆角：独立能力保留。-1 跟随主题；0 全锐角；N 统一圆润。
+     * 覆盖面：不追官方 hash 类名（升级即漂移、插件组件覆盖不到），改用
+     * 语义属性选择器通吃 —— DSH 生态组件类名统一为 'xxx_card' / 'xxx_panel' /
+     * 'xxx_bubble'（CSS module 约定），属性选择器 [class*="_card"] 全量命中；
+     * 圆形/胶囊（border-radius:50% / 999px）分档保留，避免把头像、徽标掰成方块。── */
     function applyRadius(radius) {
       const cssId = 'dshp-inx-custom-ui-radius-css'
       const old = document.getElementById(cssId)
@@ -712,15 +716,12 @@ window.__ModuleLoader__.load({
       const r = Number(radius && radius.global)
       const css = []
       if (Number.isFinite(r)) {
+        /* 语义面：官方 + 三方插件的卡片 / 面板 / 气泡 + 通用控件 */
+        const SURFACES = '[class*="_card"],[class*="_panel"],[class*="_bubble"],[class*="-card"],[class*="-panel"],[class*="-bubble"],button,input,textarea,select'
         if (r === 0) {
-          css.push([
-            '.gdEzaW_bubble', '.VOzbGW_panel', '.VOzbGW_navCell', '.VOzbGW_close',
-            'button', 'input', 'textarea', 'select', '[class*="_card"]', '[class*="_bubble"]'
-          ].join(',') + '{border-radius:0 !important}')
+          css.push(SURFACES + '{border-radius:0 !important}')
         } else if (r > 0) {
-          css.push([
-            '.gdEzaW_bubble', '.VOzbGW_panel', '.VOzbGW_navCell', '.VOzbGW_close'
-          ].join(',') + '{border-radius:' + Math.min(24, r) + 'px !important}')
+          css.push(SURFACES + '{border-radius:' + Math.min(24, r) + 'px !important}')
         }
       }
       if (css.length > 0) {
