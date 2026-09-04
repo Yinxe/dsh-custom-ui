@@ -375,6 +375,9 @@ window.__ModuleLoader__.load({
      * 要点两次"（重置+重应用发生在同一 JS 任务内，绘制前完成，无闪烁）。 */
     let desiredId = ''
 
+    /* 内置主题的画廊显示名（light/dark 也能在画廊里被切回）。 */
+    const BUILTIN_LABELS = { light: '浅色（内置）', dark: '深色（内置）' }
+
     /* ── 持久化桥：Host 半的 settings 路由（dshp-inx-custom-ui 命名空间）── */
     function createBridge() {
       const state = async () => {
