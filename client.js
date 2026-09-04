@@ -341,7 +341,7 @@ window.__ModuleLoader__.load({
             mkSlider('压暗度', wp.dim || 0, 0, 0.8, 0.05, function (v) { wpPatch({ dim: v }) })
           ) : null,
 
-          /* 毛玻璃 */
+          /* 毛玻璃：纯开关（开启 = 侧栏/详情栏半透明 + 14px 磨砂） */
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '12px' } },
             React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer' } },
               React.createElement('input', {
@@ -349,18 +349,25 @@ window.__ModuleLoader__.load({
                 onChange: function (e) { save({ glass: Object.assign({}, gl, { enabled: e.target.checked }) }) }
               }),
               '侧栏与详情栏毛玻璃（需壁纸生效）'
-            ),
-            gl.enabled === true && wp.type !== 'none' ? mkSlider('玻璃强度', gl.strength || 14, 0, 40, 1, function (v) {
-              save({ glass: Object.assign({}, gl, { strength: v }) })
-            }) : null
+            )
           ),
 
-          /* 全局圆角 */
+          /* 全局圆角：三档单选 */
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '12px' } },
-            mkSlider('全局圆角', rd.global === -1 ? -1 : rd.global, -1, 24, 1, function (v) {
-              save({ radius: { global: v } })
-            }),
-            React.createElement('p', { className: 'tg-head' }, '−1 = 默认（跟随主题）· 0 = 全锐角 · 1–24 = 统一上限（气泡/面板/按钮）')
+            React.createElement('span', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary)' } }, '全局圆角'),
+            React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+              [['-1', '默认（跟随主题）'], ['0', '全锐角'], ['12', '圆润（12px）']].map(function (opt) {
+                const value = Number(opt[0])
+                const active = Number(rd.global) === value
+                return React.createElement('button', {
+                  key: opt[0],
+                  className: active ? 'tg-card tg-active' : 'tg-card',
+                  style: { padding: '8px 12px', fontSize: '12px' },
+                  disabled: busy,
+                  onClick: function () { save({ radius: { global: value } }) }
+                }, opt[1])
+              })
+            )
           )
         )
       }
@@ -625,19 +632,24 @@ window.__ModuleLoader__.load({
        * 类名取自 layout/settings/conversation 的 CSS module 实值（VOzbGW_/pI_x6G_/gdEzaW_）。 */
       const css = []
       if (hasWallpaper) {
+        /* frame/中间栏透明，露出 body 壁纸层；body 兜底深色防白闪 */
+        css.push('body{background:#101014 !important}')
         css.push('.pI_x6G_frame{background:transparent !important}')
         css.push('.pI_x6G_centerCol{background:transparent !important}')
         const glassOn = gl.enabled === true
-        const blurStrength = Math.min(40, Math.max(0, Number(gl.strength) || 0))
-        const alpha = glassOn ? Math.min(0.85, 0.3 + blurStrength / 100) : 0.72
-        const applyGlass = (selector, base) => selector + '{background:' + base.replace('{A}', String(alpha.toFixed(2))) + (glassOn && blurStrength > 0 ? '!important;backdrop-filter:blur(' + blurStrength + 'px) saturate(1.2);-webkit-backdrop-filter:blur(' + blurStrength + 'px) saturate(1.2)' : '!important') + '}'
-        /* 三栏走主题底色半透明——保持换主题时观感一致 */
-        css.push(applyGlass('.pI_x6G_sidebarCol', 'color-mix(in srgb, var(--dsw-specific-sidebar-fill) {A}, transparent)'))
-        css.push(applyGlass('.pI_x6G_detailsCol', 'color-mix(in srgb, var(--dsw-alias-bg-layer-1) {A}, transparent)'))
-        /* 会话流本体透明，让气泡悬浮于壁纸上 */
-        css.push('.pI_x6G_centerCol{background:transparent !important}')
+        const blurStrength = glassOn ? 14 : 0
+        /* color-mix 的第二个分量必须是 72% 这样的百分比——上次传了 0.72 导致整条
+         * 声明非法，三栏背景没变透明，壁纸看起来"不生效"。 */
+        const alphaPct = glassOn ? 62 : 85
+        const colBg = (token) => 'color-mix(in srgb, ' + token + ' ' + alphaPct + '%, transparent)'
+        css.push('.pI_x6G_sidebarCol{background:' + colBg('var(--dsw-specific-sidebar-fill)') + ' !important'
+          + (glassOn ? ';backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)' : '') + '}')
+        css.push('.pI_x6G_detailsCol{background:' + colBg('var(--dsw-alias-bg-layer-1)') + ' !important'
+          + (glassOn ? ';backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)' : '') + '}')
+        /* 会话内容区也透出壁纸（浅覆盖，保证气泡可读） */
+        css.push('.pI_x6G_centerCol{background:color-mix(in srgb, var(--dsw-alias-bg-base) ' + (glassOn ? 30 : 55) + '%, transparent) !important}')
       }
-      /* 全局圆角：-1 不动；0 全锐角；N 上限截断（大圆角面收敛到 N，小圆角保留）。 */
+      /* 全局圆角：-1 跟随主题；0 全锐角；12 统一圆润。 */
       const r = Number(rd.global)
       if (Number.isFinite(r)) {
         if (r === 0) {
