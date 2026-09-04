@@ -1,6 +1,6 @@
-# @dshp-inx/theme-gallery —— DSH 主题画廊
+# @dshp-inx/custom-ui —— DSH 定制 UI 套件
 
-8 套 open-design 设计系统主题 + 设置内一键切换画廊，标准 DSH Bundle 插件包。
+主题画廊是第一个模块：8 套 open-design 主题 + 设置内一键切换。后续字体、布局、交互等定制模块都归入本包。
 
 ## 主题清单
 
@@ -21,8 +21,8 @@
 ## 结构
 
 ```
-dsh-theme-gallery/
-├── package.json          # @dshp-inx/theme-gallery，dsh.client 声明
+dsh-custom-ui/
+├── package.json          # @dshp-inx/custom-ui，dsh.client 声明
 ├── cordis.patch.yml       # bundle 挂载行
 ├── lib/
 │   ├── index.js           # Host 半（极薄占位：全部价值在浏览器侧）
@@ -45,9 +45,9 @@ dsh-theme-gallery/
 
 ```sh
 cd ~/.dsh/profiles/web
-pnpm add --offline "@dshp-inx/theme-gallery@link:../../plugins/dsh-theme-gallery"
-rm -rf node_modules/@dshp-inx/theme-gallery
-ln -s /home/yinxin/.dsh/plugins/dsh-theme-gallery node_modules/@dshp-inx/theme-gallery
+pnpm add --offline "@dshp-inx/custom-ui@link:../../plugins/dsh-custom-ui"
+rm -rf node_modules/@dshp-inx/custom-ui
+ln -s /home/yinxin/.dsh/plugins/dsh-custom-ui node_modules/@dshp-inx/custom-ui
 # cordis.patch.yml 已由 bundle 自带（cordis.patch.yml），profile 层无需再插行
 # 重启 dsh web
 ```
@@ -62,12 +62,12 @@ ln -s /home/yinxin/.dsh/plugins/dsh-theme-gallery node_modules/@dshp-inx/theme-g
 官方 theme 服务的 settings schema（`ui-theme.preference`）只接受
 `light/dark/system`——自定义主题 id 只写内存，重启即丢。本插件补上持久化：
 
-- **Host 半**：注册 `dshp-inx-theme-gallery` settings 命名空间
+- **Host 半**：注册 `dshp-inx-custom-ui` settings 命名空间
   （settings.yaml 顶层，`themeId` 字段），同源路由
-  `GET /ext/dshp-inx-theme-gallery/state`、`POST /ext/dshp-inx-theme-gallery/theme`
+  `GET /ext/dshp-inx-custom-ui/state`、`POST /ext/dshp-inx-custom-ui/theme`
 - **Client 半**：启动时读 state 恢复主题（注册完成后再 setTheme，静默容错）；
   画廊点击时先 setTheme 再 POST 保存，保存失败会提示（重启后回退内置偏好）
-- 清空持久化：把 settings.yaml 里 `dshp-inx-theme-gallery.themeId` 置空串，
+- 清空持久化：把 settings.yaml 里 `dshp-inx-custom-ui.themeId` 置空串，
   即完全跟随官方外观偏好（system/light/dark）
 - 白名单校验：Host 半只接受本插件已知的 8 个主题 id，未知 id 拒写
 

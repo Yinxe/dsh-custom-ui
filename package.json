@@ -1,9 +1,9 @@
 {
-  "name": "@dshp-inx/theme-gallery",
+  "name": "@dshp-inx/custom-ui",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Theme gallery for DeepSeek Harness: registers 8 open-design themes (OpenCode / Linear / Notion / Claude / NVIDIA / GitHub) with ~110 full token mappings each, plus a settings page for one-click theme switching.",
+  "description": "Custom UI suite for DeepSeek Harness: theme gallery is the first module (8 open-design themes with ~121 full token mappings each); future modules (fonts, layout, interactions) will live here too.",
   "license": "MIT",
   "author": "Yinxe",
   "main": "lib/index.js",

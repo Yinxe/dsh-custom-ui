@@ -1,6 +1,6 @@
-# @dshp-inx/theme-gallery bundle patch: theme gallery for DeepSeek Harness.
+# @dshp-inx/custom-ui bundle patch: theme gallery for DeepSeek Harness.
 # Registers 8 open-design themes and a settings page for one-click switching.
 
 - insert:
-    - id: dshp-inx-theme-gallery
-      name: "@dshp-inx/theme-gallery"
+    - id: dshp-inx-custom-ui
+      name: "@dshp-inx/custom-ui"

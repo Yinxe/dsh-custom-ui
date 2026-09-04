@@ -1,9 +1,9 @@
-/* theme-gallery client half — hand-authored __ModuleLoader__ bundle.
+/* custom-ui client half — hand-authored __ModuleLoader__ bundle.
  * 注册 8 套 open-design 主题到 theme 服务，并在设置面板挂「主题画廊」页：
  * 色卡预览 + 点击即切 + theme/change 驱动的实时高亮。
  * 主题 token 数据与 lib/themes/*.js 保持同步（同一来源规范）。 */
 window.__ModuleLoader__.load({
-  id: '@dshp-inx/theme-gallery',
+  id: '@dshp-inx/custom-ui',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports
@@ -199,14 +199,14 @@ window.__ModuleLoader__.load({
      * 要点两次"（重置+重应用发生在同一 JS 任务内，绘制前完成，无闪烁）。 */
     let desiredId = ''
 
-    /* ── 持久化桥：Host 半的 settings 路由（dshp-inx-theme-gallery 命名空间）── */
+    /* ── 持久化桥：Host 半的 settings 路由（dshp-inx-custom-ui 命名空间）── */
     function createBridge() {
       const state = async () => {
-        const response = await fetch('/ext/dshp-inx-theme-gallery/state', { cache: 'no-store' })
+        const response = await fetch('/ext/dshp-inx-custom-ui/state', { cache: 'no-store' })
         return response.json()
       }
       const saveTheme = async (themeId) => {
-        const response = await fetch('/ext/dshp-inx-theme-gallery/theme', {
+        const response = await fetch('/ext/dshp-inx-custom-ui/theme', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ themeId })
@@ -300,15 +300,15 @@ window.__ModuleLoader__.load({
       for (const t of THEMES) {
         ctx.effect(function () {
           return theme.register({ id: t.id, colorScheme: t.colorScheme, tokens: t.tokens })
-        }, 'theme-gallery: register ' + t.id)
+        }, 'custom-ui: register ' + t.id)
       }
 
       /* 画廊设置页 */
       const style = document.createElement('style')
-      style.setAttribute('data-plugin-css', 'dshp-inx-theme-gallery/gallery.css')
+      style.setAttribute('data-plugin-css', 'dshp-inx-custom-ui/gallery.css')
       style.textContent = CSS
       document.head.appendChild(style)
-      ctx.effect(function () { return function () { style.remove() } }, 'theme-gallery: section styles')
+      ctx.effect(function () { return function () { style.remove() } }, 'custom-ui: section styles')
 
       /* 启动恢复 + 守护：
        * 1) 读 settings 持久化的 themeId，注册完成后 setTheme 恢复；
@@ -324,11 +324,11 @@ window.__ModuleLoader__.load({
           desiredId = saved
           try { theme.setTheme(saved) } catch (e) {
             desiredId = ''
-            console.log('[dshp-inx-theme-gallery] 恢复主题失败（可能插件版本不匹配）: ' + String(e && e.message))
+            console.log('[dshp-inx-custom-ui] 恢复主题失败（可能插件版本不匹配）: ' + String(e && e.message))
           }
         }
       }).catch(function (e) {
-        console.log('[dshp-inx-theme-gallery] 读取持久化主题失败: ' + String((e && e.message) || e))
+        console.log('[dshp-inx-custom-ui] 读取持久化主题失败: ' + String((e && e.message) || e))
       })
 
       ctx.effect(function () {
@@ -337,21 +337,21 @@ window.__ModuleLoader__.load({
           const activeId = snap && snap.active ? snap.active.id : ''
           if (activeId !== desiredId) {
             try { theme.setTheme(desiredId) } catch (e) {
-              console.log('[dshp-inx-theme-gallery] 守护重应用失败: ' + String(e && e.message))
+              console.log('[dshp-inx-custom-ui] 守护重应用失败: ' + String(e && e.message))
             }
           }
         })
-      }, 'theme-gallery: preference guard')
+      }, 'custom-ui: preference guard')
 
       const Gallery = createGallery(ctx, theme, bridge)
       ctx.effect(function () {
         return slots.inject('settings.section', function () {
           return slots.register(
-            { name: 'settings.section', id: 'dshp-inx-theme-gallery', order: 50, label: '主题画廊' },
+            { name: 'settings.section', id: 'dshp-inx-custom-ui', order: 50, label: '主题画廊' },
             Gallery
           )
         })
-      }, 'theme-gallery: settings section')
+      }, 'custom-ui: settings section')
     }
 
     return module.exports
