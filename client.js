@@ -662,19 +662,25 @@ window.__ModuleLoader__.load({
         /* frame/中间栏透明，露出 body 壁纸层；body 兜底深色防白闪 */
         css.push('body{background:#101014 !important}')
         css.push('.pI_x6G_frame{background:transparent !important}')
-        css.push('.pI_x6G_centerCol{background:transparent !important}')
         const glassOn = gl.enabled === true
-        const blurStrength = glassOn ? 14 : 0
-        /* color-mix 的第二个分量必须是 72% 这样的百分比——上次传了 0.72 导致整条
+        /* color-mix 的第二个分量必须是 62% 这样的百分比——之前传 0.72 导致整条
          * 声明非法，三栏背景没变透明，壁纸看起来"不生效"。 */
         const alphaPct = glassOn ? 62 : 85
         const colBg = (token) => 'color-mix(in srgb, ' + token + ' ' + alphaPct + '%, transparent)'
-        css.push('.pI_x6G_sidebarCol{background:' + colBg('var(--dsw-specific-sidebar-fill)') + ' !important'
-          + (glassOn ? ';backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)' : '') + '}')
-        css.push('.pI_x6G_detailsCol{background:' + colBg('var(--dsw-alias-bg-layer-1)') + ' !important'
-          + (glassOn ? ';backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)' : '') + '}')
+        /* 毛玻璃必须放在 ::before 伪元素上，绝不能放在 sidebarCol/detailsCol 元素自身：
+         * backdrop-filter 会把元素变成其内 position:fixed 后代的包含块——
+         * 设置 dialog（.VOzbGW_overlay fixed）渲染在 sidebar 树内（SettingsRoot
+         * 挂 sidebar.settings 槽），一旦 sidebarCol 自带 backdrop-filter，
+         * dialog 的定位基准就从视口变成侧栏列，整个面板被压进侧栏（真实翻车案例）。
+         * 伪元素不构成 fixed 后代的包含块，安全。 */
+        const glassBefore = (selector, token) => selector + '::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none'
+          + (glassOn ? ';backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)' : '')
+          + ';background:' + colBg(token) + '}'
+        css.push('.pI_x6G_sidebarCol,.pI_x6G_detailsCol,.pI_x6G_centerCol{position:relative;background:transparent !important}')
+        css.push(glassBefore('.pI_x6G_sidebarCol', 'var(--dsw-specific-sidebar-fill)'))
+        css.push(glassBefore('.pI_x6G_detailsCol', 'var(--dsw-alias-bg-layer-1)'))
         /* 会话内容区也透出壁纸（浅覆盖，保证气泡可读） */
-        css.push('.pI_x6G_centerCol{background:color-mix(in srgb, var(--dsw-alias-bg-base) ' + (glassOn ? 30 : 55) + '%, transparent) !important}')
+        css.push('.pI_x6G_centerCol::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:color-mix(in srgb, var(--dsw-alias-bg-base) ' + (glassOn ? 30 : 55) + '%, transparent)}')
       }
       /* 全局圆角：-1 跟随主题；0 全锐角；12 统一圆润。 */
       const r = Number(rd.global)
