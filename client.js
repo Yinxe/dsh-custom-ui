@@ -533,14 +533,16 @@ window.__ModuleLoader__.load({
                 onChange: function (e) { pickPhoto(e.target.files && e.target.files[0]); e.target.value = '' }
               }))))
 
-        /* 全局圆角三档：保存即生效（独立于主题，保留的轻量外观能力） */
+        /* 全局圆角三档：保存即生效。同时写模块级 desiredRadius——
+         * theme/change 触发 setRevision 时若组件树因 key 重建，state 也不丢。 */
         const pickRadius = function (v) {
+          desiredRadius = v
           setRadiusCfg(v)
           bridge.saveConfig({ radius: { global: v } }).then(function (reply) {
             if (reply && reply.ok === true) applyRadius(reply.radius)
           }).catch(function () { /* 保存失败静默：下次刷新回读 */ })
         }
-        const rdNow = radiusCfg && typeof radiusCfg.global === 'number' ? radiusCfg.global : -1
+        const rdNow = typeof radiusCfg === 'number' ? radiusCfg : -1
         const radiusButtons = [['-1', '默认（跟随主题）'], ['0', '全锐角'], ['12', '圆润（12px）']].map(function (opt) {
           const value = Number(opt[0])
           const active = rdNow === value
@@ -551,7 +553,7 @@ window.__ModuleLoader__.load({
           }, opt[1])
         })
 
-        return React.createElement('div', { key: 'tg-r' + String(revision), className: 'tg-page' },
+        return React.createElement('div', { className: 'tg-page' },
           React.createElement('p', { className: 'tg-head' }, '当前主题：' + currentLabel + '（点击卡片切换，选择自动保存）'),
           notice && notice.err ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-error-primary)' } }, notice.err) : null,
           notice && notice.ok ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-success-primary)' } }, notice.ok) : null,
