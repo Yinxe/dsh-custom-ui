@@ -1,7 +1,9 @@
 /* custom-ui client half — hand-authored __ModuleLoader__ bundle.
- * 注册 8 套 open-design 主题到 theme 服务，并在设置面板挂「主题画廊」页：
- * 色卡预览 + 点击即切 + theme/change 驱动的实时高亮。
- * 主题 token 数据与 lib/themes/*.js 保持同步（同一来源规范）。 */
+ * 「外观定制 = 调色盘」：参考 QQ 超级调色盘——分组主题卡片（渐变色卡）+
+ * 图片取色生成专属渐变主题（上传图片 → 提取主色 → 亮/暗双套 token + body 渐变）。
+ * 架构：官方亮/暗为唯一偏好（overrideTokens 覆盖层），持久化走 Host settings。
+ * 主题 token 数据与 lib/themes/*.js 保持同步（同一来源规范）；photo 取色算法
+ * 与 lib/themes/photo.js 同源。 */
 window.__ModuleLoader__.load({
   id: '@dshp-inx/custom-ui',
   factory: (require) => {
@@ -10,24 +12,33 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
     const React = require('react')
 
-    /* ── 画廊样式（全部走 --dsw-* 主题 token，随主题自适应）── */
+    /* ── 调色盘样式（全部走 --dsw-* 主题 token，随主题自适应）── */
     const CSS = `
 .tg-page{display:flex;flex-direction:column;gap:14px;color:var(--dsw-alias-label-primary)}
 .tg-head{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}
-.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.tg-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:14px;cursor:pointer;text-align:left;border-radius:8px;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);transition:border-color .15s,background .15s}
-.tg-card:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.tg-group{display:flex;flex-direction:column;gap:10px}
+.tg-groupTitle{display:flex;flex-direction:column;gap:2px}
+.tg-groupName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:600;line-height:20px}
+.tg-groupSub{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}
+.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px}
+.tg-card{display:flex;flex-direction:column;gap:8px;padding:10px;cursor:pointer;text-align:left;border-radius:12px;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);transition:border-color .15s,background .15s,transform .15s}
+.tg-card:hover{background:var(--dsw-alias-interactive-bg-hover);transform:translateY(-1px)}
 .tg-card:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
-.tg-card.tg-active{background:var(--dsw-alias-interactive-bg-hover-accent);border:2px solid var(--dsw-alias-brand-primary)}
-.tg-titleRow{display:flex;align-items:center;gap:8px}
-.tg-title{font-size:13px;font-weight:600;line-height:18px}
-.tg-badge{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary-invert);white-space:nowrap}
-.tg-swatches{display:flex;gap:4px}
-.tg-swatch{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--dsw-alias-border-l2)}
-.tg-desc{font-size:11px;color:var(--dsw-alias-label-tertiary);line-height:16px}
+.tg-card.tg-active{border:2px solid var(--dsw-alias-brand-primary)}
+.tg-canvas{display:block;width:100%;height:64px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);position:relative;overflow:hidden}
+.tg-canvasLabel{position:absolute;left:8px;bottom:6px;right:8px;display:flex;align-items:center;gap:6px}
+.tg-title{font-size:12.5px;font-weight:600;line-height:17px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.tg-titleDark{color:rgba(20,20,22,.85);text-shadow:0 1px 1px rgba(255,255,255,.6)}
+.tg-badge{position:absolute;top:6px;right:6px;font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-brand-primary);color:#fff;white-space:nowrap}
+.tg-desc{font-size:11px;color:var(--dsw-alias-label-tertiary);line-height:15px}
+.tg-photoCard{background:conic-gradient(from 180deg,#f87171,#fbbf24,#4ade80,#38bdf8,#818cf8,#f472b6,#f87171)}
 .tg-release{border:none;background:none;padding:0;font:inherit;font-size:12px;cursor:pointer;color:var(--dsw-alias-brand-primary)}
 .tg-release:hover{text-decoration:underline}
 .tg-release:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:2px}
+.tg-radiusRow{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l1);padding-top:12px;margin-top:4px}
+.tg-radiusLabel{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.tg-radiusBtns{display:flex;gap:8px;flex-wrap:wrap}
+.tg-radiusBtn{padding:8px 12px;font-size:12px}
 `
 
     /* ── 字体栈常量（与 lib/themes/shared.js 同源）── */
@@ -177,205 +188,187 @@ window.__ModuleLoader__.load({
       '--dsw-font-family': SANS, '--dsw-font-mono': MONO
     }, SANS)
 
-    /* ── 主题目录（与 lib/themes/index.js 的 THEME_CATALOG 同源）── */
+    /* ── 主题目录（与 lib/themes/index.js 的 THEME_CATALOG 同源）──
+     * gradient：卡片渐变背景（QQ 调色盘观感）；group：分组归属。 */
     const THEMES = [
-      { id: 'opencode-terminal-dark', colorScheme: 'dark', tokens: opencodeDark, label: 'OpenCode 暱夜终端', desc: '暖黑 #201d1d + Apple 蓝，全站 mono', swatch: ['#201d1d', '#302c2c', '#007aff', '#30d158'] },
-      { id: 'opencode-terminal-light', colorScheme: 'light', tokens: opencodeLight, label: 'OpenCode 纸感终端', desc: '暖白 #fdfcfc + 暖灰层次', swatch: ['#fdfcfc', '#f1eeee', '#201d1d', '#007aff'] },
-      { id: 'linear-dark', colorScheme: 'dark', tokens: linearDark, label: 'Linear 暗夜无彩', desc: '近黑 #08090a + Indigo #5e6ad2', swatch: ['#08090a', '#191a1b', '#5e6ad2', '#f7f8f8'] },
-      { id: 'notion-light', colorScheme: 'light', tokens: notionLight, label: 'Notion 暖白极简', desc: '纯白 + 暖灰 + Notion 蓝', swatch: ['#ffffff', '#f6f5f4', '#31302e', '#0075de'] },
-      { id: 'claude-parchment-light', colorScheme: 'light', tokens: claudeLight, label: 'Claude 羊皮纸', desc: '羊皮纸 #f5f4ed + 赤陶 #c96442', swatch: ['#f5f4ed', '#faf9f5', '#c96442', '#141413'] },
-      { id: 'nvidia-dark', colorScheme: 'dark', tokens: nvidiaDark, label: 'NVIDIA 硬核绿', desc: '纯黑 #000 + 信号绿 #76b900', swatch: ['#000000', '#1a1a1a', '#76b900', '#ffffff'] },
-      { id: 'github-dark', colorScheme: 'dark', tokens: githubDark, label: 'GitHub 暗色 Primer', desc: '#0d1117 + Primer 蓝 #2f81f7', swatch: ['#0d1117', '#161b22', '#2f81f7', '#3fb950'] },
-      { id: 'github-light', colorScheme: 'light', tokens: githubLight, label: 'GitHub 亮色 Primer', desc: '纯白 + #0969da + 绿色按钮', swatch: ['#ffffff', '#f6f8fa', '#0969da', '#1f883d'] }
+      { id: 'opencode-terminal-dark', colorScheme: 'dark', tokens: opencodeDark, label: '暱夜终端', desc: '暖黑 + Apple 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#201d1d,#302c2c 60%,#007aff)', lightLabel: false },
+      { id: 'opencode-terminal-light', colorScheme: 'light', tokens: opencodeLight, label: '纸感终端', desc: '暖白 + 暖灰', group: '终端美学', gradient: 'linear-gradient(135deg,#fdfcfc,#f1eeee 60%,#e2dcdc)', lightLabel: true },
+      { id: 'github-dark', colorScheme: 'dark', tokens: githubDark, label: 'GitHub 暗色', desc: '#0d1117 + Primer 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#0d1117,#161b22 60%,#2f81f7)', lightLabel: false },
+      { id: 'github-light', colorScheme: 'light', tokens: githubLight, label: 'GitHub 亮色', desc: '纯白 + #0969da', group: '终端美学', gradient: 'linear-gradient(135deg,#ffffff,#f6f8fa 60%,#0969da)', lightLabel: true },
+      { id: 'linear-dark', colorScheme: 'dark', tokens: linearDark, label: 'Linear 无彩', desc: '近黑 + Indigo', group: '极简风物', gradient: 'linear-gradient(135deg,#08090a,#191a1b 55%,#5e6ad2)', lightLabel: false },
+      { id: 'notion-light', colorScheme: 'light', tokens: notionLight, label: 'Notion 暖白', desc: '纯白 + 暖灰', group: '极简风物', gradient: 'linear-gradient(135deg,#ffffff,#f6f5f4 55%,#e8e7e5)', lightLabel: true },
+      { id: 'claude-parchment-light', colorScheme: 'light', tokens: claudeLight, label: 'Claude 羊皮纸', desc: '羊皮纸 + 赤陶', group: '极简风物', gradient: 'linear-gradient(135deg,#f5f4ed,#faf9f5 55%,#c96442)', lightLabel: true },
+      { id: 'nvidia-dark', colorScheme: 'dark', tokens: nvidiaDark, label: 'NVIDIA 硬核', desc: '纯黑 + 信号绿', group: '极简风物', gradient: 'linear-gradient(135deg,#000000,#1a1a1a 55%,#76b900)', lightLabel: false }
     ]
 
-    /* ── 设置页：背景与外观卡片（壁纸上传/选择/删除 + 模糊/压暗/毛玻璃/圆角）── */
-    function createBackgroundPanel(bridge, onChange) {
-      return function BackgroundPanel() {
-        const [cfg, setCfg] = React.useState(null)
-        const [files, setFiles] = React.useState([])
-        const [busy, setBusy] = React.useState(false)
-        const [notice, setNotice] = React.useState(null)
+    /* 分组定义（QQ 调色盘式：组名 + 文艺副标题）。 */
+    const GROUPS = [
+      { name: '终端美学', sub: '代码即诗，暗色为主的两端开发味' },
+      { name: '极简风物', sub: '少即是多，克制的品牌色' }
+    ]
 
-        const reload = React.useCallback(function () {
-          bridge.state().then(function (reply) {
-            if (reply && reply.ok === true) {
-              setCfg({ wallpaper: reply.wallpaper, glass: reply.glass, radius: reply.radius })
-              setNotice(null)
-            } else {
-              setNotice({ err: (reply && reply.error) || '状态读取失败' })
-            }
-          }).catch(function (e) { setNotice({ err: '状态读取失败：' + String((e && e.message) || e) }) })
-          fetch('/ext/dshp-inx-custom-ui/wallpapers').then(function (r) { return r.json() }).then(function (reply) {
-            if (reply && reply.ok === true) setFiles(reply.files || [])
-          }).catch(function () { /* 列表失败不阻塞 */ })
-        }, [])
-        React.useEffect(function () { reload() }, [reload])
+    /* ── 图片取色主题（与 lib/themes/photo.js 同源）── */
+    function hexToHsl(hex) {
+      const r = parseInt(hex.slice(1, 3), 16) / 255
+      const g = parseInt(hex.slice(3, 5), 16) / 255
+      const b = parseInt(hex.slice(5, 7), 16) / 255
+      const max = Math.max(r, g, b); const min = Math.min(r, g, b)
+      let h = 0; let s = 0
+      const l = (max + min) / 2
+      if (max !== min) {
+        const d = max - min
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+        else if (max === g) h = ((b - r) / d + 2) / 6
+        else h = ((r - g) / d + 4) / 6
+      }
+      return { h: h * 360, s, l }
+    }
+    function hslToHex(h, s, l) {
+      h = ((h % 360) + 360) % 360
+      const c = (1 - Math.abs(2 * l - 1)) * s
+      const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+      const m = l - c / 2
+      let r = 0; let g = 0; let b = 0
+      const seg = Math.floor(h / 60)
+      if (seg === 0) { r = c; g = x } else if (seg === 1) { r = x; g = c } else if (seg === 2) { g = c; b = x } else if (seg === 3) { g = x; b = c } else if (seg === 4) { r = x; b = c } else { r = c; b = x }
+      const to = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+      return '#' + to(r) + to(g) + to(b)
+    }
+    function rgbToHex(r, g, b) {
+      const to = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+      return '#' + to(r) + to(g) + to(b)
+    }
+    function withAlpha(hex, a) {
+      const r = parseInt(hex.slice(1, 3), 16); const g = parseInt(hex.slice(3, 5), 16); const b = parseInt(hex.slice(5, 7), 16)
+      return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + a + ')'
+    }
 
-        const save = function (patch) {
-          setBusy(true)
-          bridge.saveConfig(patch).then(function (reply) {
-            setBusy(false)
-            if (reply && reply.ok === true) {
-              setCfg({ wallpaper: reply.wallpaper, glass: reply.glass, radius: reply.radius })
-              if (onChange) onChange(reply)
-              setNotice({ ok: '已保存' })
-            } else {
-              setNotice({ err: (reply && reply.error) || '保存失败' })
-            }
-          }).catch(function (e) {
-            setBusy(false)
-            setNotice({ err: '保存失败：' + String((e && e.message) || e) })
-          })
-        }
+    /** 从 ImageData 提取主色：饱和度过滤 + 色相分桶 + 加权选桶。 */
+    function extractDominant(data) {
+      const buckets = new Array(12).fill(null).map(() => ({ count: 0, r: 0, g: 0, b: 0, sat: 0 }))
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]; const g = data[i + 1]; const b = data[i + 2]
+        const { h, s, l } = hexToHsl(rgbToHex(r, g, b))
+        if (s < 0.15 || l < 0.06 || l > 0.96) continue
+        const bucket = buckets[Math.floor(h / 30) % 12]
+        bucket.count++
+        bucket.r += r; bucket.g += g; bucket.b += b
+        bucket.sat += s
+      }
+      let best = null; let bestScore = 0
+      for (const bucket of buckets) {
+        if (bucket.count === 0) continue
+        const score = bucket.count * (0.3 + bucket.sat / bucket.count)
+        if (score > bestScore) { bestScore = score; best = bucket }
+      }
+      if (!best) return '#3b82f6'
+      return rgbToHex(best.r / best.count, best.g / best.count, best.b / best.count)
+    }
 
-        const upload = function (file) {
-          if (!file) return
-          setBusy(true)
-          setNotice(null)
-          const form = new FormData()
-          form.append('file', file, file.name)
-          fetch('/ext/dshp-inx-custom-ui/wallpaper', { method: 'POST', body: form }).then(function (r) { return r.json() }).then(function (reply) {
-            setBusy(false)
-            if (reply && reply.ok === true) {
-              const isVideo = /\.(mp4|webm)$/i.test(reply.name)
-              save({ wallpaper: { type: isVideo ? 'video' : 'image', file: reply.name, blur: (cfg && cfg.wallpaper && cfg.wallpaper.blur) || 0, dim: (cfg && cfg.wallpaper && cfg.wallpaper.dim) || 0 } })
-              reload()
-            } else {
-              setNotice({ err: (reply && reply.error) || '上传失败' })
-            }
-          }).catch(function (e) {
-            setBusy(false)
-            setNotice({ err: '上传失败：' + String((e && e.message) || e) })
-          })
-        }
-
-        const del = function (name) {
-          setBusy(true)
-          fetch('/ext/dshp-inx-custom-ui/wallpaper-delete', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ name })
-          }).then(function (r) { return r.json() }).then(function (reply) {
-            setBusy(false)
-            if (reply && reply.ok === true) reload()
-            else setNotice({ err: (reply && reply.error) || '删除失败' })
-          }).catch(function (e) {
-            setBusy(false)
-            setNotice({ err: '删除失败：' + String((e && e.message) || e) })
-          })
-        }
-
-        if (cfg === null) {
-          return React.createElement('p', { className: 'tg-head' }, '读取配置中…')
-        }
-
-        const wp = cfg.wallpaper || { type: 'none', file: '', blur: 0, dim: 0 }
-        const gl = cfg.glass || { enabled: false, strength: 14 }
-        const rd = cfg.radius || { global: -1 }
-
-        const sliders = []
-        const mkSlider = function (label, value, min, max, step, onInput) {
-          return React.createElement('label', { key: label, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary)' } },
-            React.createElement('span', { style: { width: '72px', flex: 'none' } }, label),
-            React.createElement('input', {
-              type: 'range', min: String(min), max: String(max), step: String(step),
-              value: String(value), disabled: busy,
-              style: { flex: '1' },
-              onChange: function (e) { onInput(Number(e.target.value)) }
-            }),
-            React.createElement('span', { style: { width: '40px', textAlign: 'right', flex: 'none' } }, String(value))
-          )
-        }
-
-        const wpPatch = function (patch) {
-          save({ wallpaper: Object.assign({}, wp, patch) })
-        }
-
-        return React.createElement('div', { className: 'tg-page' },
-          React.createElement('p', { className: 'tg-head' }, '壁纸与视觉效果（选择即时保存）'),
-          notice && notice.err ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-error-primary)' } }, notice.err) : null,
-          notice && notice.ok ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-success-primary)' } }, notice.ok) : null,
-
-          /* 壁纸选择行 */
-          React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } },
-            React.createElement('button', {
-              className: 'tg-card' + (wp.type === 'none' ? ' tg-active' : ''), style: { padding: '8px 12px' },
-              disabled: busy,
-              onClick: function () { wpPatch({ type: 'none', file: '' }) }
-            }, '无壁纸'),
-            React.createElement('label', { className: 'tg-card', style: { padding: '8px 12px', cursor: 'pointer' } },
-              busy ? '处理中…' : '上传壁纸（图片 ≤24MB / 视频 ≤96MB）',
-              React.createElement('input', {
-                type: 'file',
-                accept: '.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp,.mp4,.webm',
-                style: { display: 'none' },
-                disabled: busy,
-                onChange: function (e) { upload(e.target.files && e.target.files[0]) }
-              }))
-          ),
-
-          /* 文件列表 */
-          files.length > 0 ? React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-            files.map(function (f) {
-              const active = wp.file === f.name && wp.type !== 'none'
-              const icon = f.type === 'video' ? '🎬' : '🖼️'
-              return React.createElement('span', { key: f.name, style: { display: 'inline-flex', gap: '6px', alignItems: 'center', padding: '6px 10px', borderRadius: '8px', border: active ? '2px solid var(--dsw-alias-brand-primary)' : '1px solid var(--dsw-alias-border-l1)', background: active ? 'var(--dsw-alias-interactive-bg-hover-accent)' : 'var(--dsw-alias-bg-layer-1)', fontSize: '12px' } },
-                icon,
-                React.createElement('button', {
-                  style: { border: 'none', background: 'none', color: 'inherit', cursor: 'pointer', font: 'inherit', padding: 0 },
-                  onClick: function () { wpPatch({ type: f.type, file: f.name }) }
-                }, f.name),
-                React.createElement('span', { style: { color: 'var(--dsw-alias-label-tertiary)' } }, Math.round(f.size / 1024) + 'K'),
-                React.createElement('button', {
-                  style: { border: 'none', background: 'none', color: 'var(--dsw-alias-state-error-primary)', cursor: 'pointer', padding: 0, font: 'inherit' },
-                  disabled: busy,
-                  onClick: function () { del(f.name) }
-                }, '✕'))
-            })
-          ) : null,
-
-          /* 模糊 / 压暗 */
-          wp.type !== 'none' ? React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
-            mkSlider('模糊度', wp.blur || 0, 0, 40, 1, function (v) { wpPatch({ blur: v }) }),
-            mkSlider('压暗度', wp.dim || 0, 0, 0.8, 0.05, function (v) { wpPatch({ dim: v }) })
-          ) : null,
-
-          /* 毛玻璃：纯开关（开启 = 侧栏/详情栏半透明 + 14px 磨砂） */
-          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '12px' } },
-            React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer' } },
-              React.createElement('input', {
-                type: 'checkbox', checked: gl.enabled === true, disabled: busy,
-                onChange: function (e) { save({ glass: Object.assign({}, gl, { enabled: e.target.checked }) }) }
-              }),
-              '侧栏与详情栏毛玻璃（需壁纸生效）'
-            )
-          ),
-
-          /* 全局圆角：三档单选 */
-          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '12px' } },
-            React.createElement('span', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-secondary)' } }, '全局圆角'),
-            React.createElement('div', { style: { display: 'flex', gap: '8px' } },
-              [['-1', '默认（跟随主题）'], ['0', '全锐角'], ['12', '圆润（12px）']].map(function (opt) {
-                const value = Number(opt[0])
-                const active = Number(rd.global) === value
-                return React.createElement('button', {
-                  key: opt[0],
-                  className: active ? 'tg-card tg-active' : 'tg-card',
-                  style: { padding: '8px 12px', fontSize: '12px' },
-                  disabled: busy,
-                  onClick: function () { save({ radius: { global: value } }) }
-                }, opt[1])
-              })
-            )
-          )
-        )
+    function extractPalette(data) {
+      const accent = extractDominant(data)
+      const { h, s } = hexToHsl(accent)
+      return {
+        accent,
+        companionA: hslToHex(h + 28, Math.min(0.85, s + 0.05), 0.52),
+        companionB: hslToHex(h - 28, Math.min(0.8, s), 0.46)
       }
     }
+
+    /** 调色盘 → 完整主题 token（亮/暗双份，与 lib/themes/photo.js 同源）。 */
+    function buildPhotoTokens(palette, scheme) {
+      const { accent } = palette
+      const { h, s } = hexToHsl(accent)
+      const dark = scheme === 'dark'
+      const base = dark
+        ? { bg: hslToHex(h, Math.min(0.5, s * 0.7), 0.07), l1: hslToHex(h, Math.min(0.45, s * 0.6), 0.11), l2: hslToHex(h, Math.min(0.42, s * 0.55), 0.145), l3: hslToHex(h, Math.min(0.4, s * 0.5), 0.18) }
+        : { bg: hslToHex(h, 0.28, 0.97), l1: hslToHex(h, 0.22, 0.94), l2: hslToHex(h, 0.18, 0.91), l3: hslToHex(h, 0.16, 0.88) }
+      const brand = dark ? hslToHex(h, Math.max(0.55, s), 0.62) : hslToHex(h, Math.max(0.6, s), 0.42)
+      const brandHover = dark ? hslToHex(h, Math.max(0.55, s), 0.72) : hslToHex(h, Math.max(0.6, s), 0.34)
+      const textPrimary = dark ? hslToHex(h, 0.08, 0.95) : hslToHex(h, 0.35, 0.12)
+      const textSecondary = dark ? hslToHex(h, 0.06, 0.78) : hslToHex(h, 0.22, 0.28)
+      const textTertiary = dark ? hslToHex(h, 0.05, 0.6) : hslToHex(h, 0.16, 0.45)
+      const textQuaternary = dark ? hslToHex(h, 0.05, 0.44) : hslToHex(h, 0.12, 0.6)
+      const border1 = dark ? hslToHex(h, 0.3, 0.2) : hslToHex(h, 0.24, 0.86)
+      const border2 = dark ? hslToHex(h, 0.35, 0.3) : hslToHex(h, 0.3, 0.74)
+      const hover = dark ? hslToHex(h, 0.3, 0.15) : hslToHex(h, 0.3, 0.92)
+      const active = dark ? hslToHex(h, 0.32, 0.2) : hslToHex(h, 0.32, 0.88)
+      return {
+        '--dsw-alias-bg-base': base.bg, '--dsw-alias-bg-layer-1': base.l1, '--dsw-alias-bg-layer-2': base.l2, '--dsw-alias-bg-layer-3': base.l3,
+        '--dsw-alias-bg-overlay': base.l1, '--dsw-alias-bg-multi-select': base.l2, '--dsw-alias-bg-module-platform': base.l1, '--dsw-alias-bg-skeleton': base.l2,
+        '--dsw-alias-border-l1': border1, '--dsw-alias-border-l2': border2, '--dsw-alias-border-l2-darkmode-thin': border1, '--dsw-alias-border-l3': border2,
+        '--dsw-alias-border-l4': dark ? textTertiary : border2, '--dsw-alias-border-inverted': textPrimary, '--dsw-alias-border-inverted2': textSecondary,
+        '--dsw-alias-separator-primary': border1, '--dsw-alias-line-secondary': base.l2, '--dsw-alias-fill-l2': base.l2,
+        '--dsw-alias-fill-tsp-secondary': dark ? withAlpha(textPrimary, 0.05) : withAlpha(textPrimary, 0.04),
+        '--dsw-alias-brand-primary': brand, '--dsw-alias-brand-primary-invert': dark ? base.bg : '#ffffff', '--dsw-alias-brand-text': brand,
+        '--dsw-alias-button-primary-fill': brand, '--dsw-alias-button-primary-hover': brandHover, '--dsw-alias-button-primary-dimmed': brandHover,
+        '--dsw-alias-button-contrast-fill': textPrimary, '--dsw-alias-button-elevated-fill': base.l1, '--dsw-alias-button-floating-fill': base.l1,
+        '--dsw-alias-button-floating-hover': base.l2, '--dsw-alias-button-ghost-active-border': border2, '--dsw-alias-button-ghost-active-fill': hover,
+        '--dsw-alias-button-ghost-active-hover': active, '--dsw-alias-button-info-fill': brand, '--dsw-alias-button-info-hover': brandHover,
+        '--dsw-alias-button-tool-bar-fill': base.l1, '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': hover,
+        '--dsw-alias-interactive-bg-hover': hover, '--dsw-alias-interactive-bg-active': active,
+        '--dsw-alias-interactive-bg-hover-accent': withAlpha(brand, dark ? 0.2 : 0.12), '--dsw-alias-interactive-bg-hover-danger': withAlpha('#ef4444', dark ? 0.18 : 0.1),
+        '--dsw-alias-interactive-bg-hover-solid': active,
+        '--dsw-alias-label-primary': textPrimary, '--dsw-alias-label-secondary': textSecondary, '--dsw-alias-label-tertiary': textTertiary,
+        '--dsw-alias-label-quaternary': textQuaternary, '--dsw-alias-label-caption': textTertiary, '--dsw-alias-label-dimmed': textQuaternary,
+        '--dsw-alias-label-error': dark ? '#f87171' : '#dc2626', '--dsw-alias-label-primary-foreground': dark ? textPrimary : '#ffffff',
+        '--dsw-alias-label-primary-inverted': dark ? base.bg : '#ffffff', '--dsw-alias-label-primary-bluish': brand,
+        '--dsw-alias-state-error-primary': dark ? '#f87171' : '#dc2626', '--dsw-alias-state-error-secondary': withAlpha('#ef4444', dark ? 0.15 : 0.1),
+        '--dsw-alias-state-success-primary': dark ? '#4ade80' : '#16a34a', '--dsw-alias-state-success-secondary': withAlpha('#22c55e', dark ? 0.15 : 0.1),
+        '--dsw-alias-state-warn-primary': dark ? '#fbbf24' : '#d97706', '--dsw-alias-state-warn-secondary': withAlpha('#f59e0b', dark ? 0.15 : 0.1),
+        '--dsw-alias-state-warn-label': dark ? '#fbbf24' : '#b45309',
+        '--dsw-alias-markdown-citation': brand, '--dsw-alias-markdown-code-block': base.l1, '--dsw-alias-markdown-code-block-banner': base.l2,
+        '--dsw-alias-markdown-inline-code': withAlpha(brand, dark ? 0.14 : 0.1), '--dsw-alias-markdown-code-segment-selected': withAlpha(brand, dark ? 0.25 : 0.16),
+        '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': textQuaternary, '--dsw-alias-markdown-tag': textTertiary,
+        '--dsw-alias-scrollbar-bg-l1': border2, '--dsw-alias-scrollbar-bg-l2': base.l2, '--dsw-alias-scrollbar-hover-l1': textTertiary, '--dsw-alias-scrollbar-hover-l2': border2,
+        '--dsw-alias-toast-bg': base.l1, '--dsw-alias-tooltip-bg': dark ? base.l3 : hslToHex(h, 0.35, 0.14), '--dsw-hovercard-bg': base.l1,
+        '--dsw-specific-sidebar-fill': base.bg, '--dsw-specific-sidebar-nav-item-active': active, '--dsw-specific-sidebar-nav-item-active-accent': brand,
+        '--dsw-specific-sidebar-nav-item-hover': hover, '--dsw-specific-bubble': base.l1, '--dsw-specific-bubble-highlight': base.l2,
+        '--dsw-specific-input-major': base.l1, '--dsw-specific-login-input': base.l1, '--dsw-specific-menu': base.l1,
+        '--dsw-specific-selector': base.l1, '--dsw-specific-tip': base.l2,
+        '--dsw-shadow-lv1': dark ? '0 2px 8px rgba(0,0,0,0.4)' : '0 1px 3px rgba(0,0,0,0.08)',
+        '--dsw-shadow-lv2': dark ? '0 4px 16px rgba(0,0,0,0.45)' : '0 2px 8px rgba(0,0,0,0.08)',
+        '--dsw-shadow-lv3': dark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 4px 16px rgba(0,0,0,0.1)', '--dsw-shadow-lv1-blur': '8px',
+        '--dshp-cu-body-gradient': dark
+          ? 'radial-gradient(1000px 600px at 85% -10%, ' + withAlpha(palette.companionA, 0.16) + ', transparent 55%), radial-gradient(900px 560px at 8% 108%, ' + withAlpha(palette.companionB, 0.13) + ', transparent 58%), linear-gradient(180deg, ' + base.bg + ', ' + hslToHex(h, Math.min(0.5, s * 0.7), 0.05) + ')'
+          : 'radial-gradient(1000px 600px at 85% -10%, ' + withAlpha(palette.companionA, 0.22) + ', transparent 55%), radial-gradient(900px 560px at 8% 108%, ' + withAlpha(palette.companionB, 0.18) + ', transparent 58%), linear-gradient(180deg, ' + base.bg + ', ' + hslToHex(h, 0.28, 0.99) + ')',
+        '--dsw-font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
+        '--dsw-font-mono': '"Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace'
+      }
+    }
+
+    /** 图片 File → 调色盘（48×48 canvas 采样）。 */
+    function paletteFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file)
+        const img = new Image()
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas')
+            canvas.width = 48; canvas.height = 48
+            const ctx = canvas.getContext('2d', { willReadFrequently: true })
+            ctx.drawImage(img, 0, 0, 48, 48)
+            const data = ctx.getImageData(0, 0, 48, 48).data
+            resolve(extractPalette(data))
+          } catch (e) { reject(e) } finally { URL.revokeObjectURL(url) }
+        }
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片解码失败')) }
+        img.src = url
+      })
+    }
+
+    /* 图片主题的运行时登记表：id 'photo:<hash>'；palette 持久化到 settings。 */
+    const PHOTO_ID = 'photo:custom'
+    let photoTheme = null /* { palette, dark, light } */
+    /* apply 作用域的 renderBodyGradient 注入桥（Gallery 的 theme/change 监听调用） */
+    const renderBodyGradientRef = { fn: null }
 
 
     /* ── 持久化主题选择：非空 = 有自定义覆盖层在生效（见 apply 的覆盖层架构）── */
     let desiredId = ''
+    /* 持久化的全局圆角（-1 默认；画廊挂载时作初值） */
+    let desiredRadius = -1
 
     /* 内置主题的画廊显示名（light/dark 也能在画廊里被切回）。 */
     const BUILTIN_LABELS = { light: '浅色（内置）', dark: '深色（内置）' }
@@ -422,9 +415,12 @@ window.__ModuleLoader__.load({
       return function ThemeGallery() {
         const [revision, setRevision] = React.useState(-1)
         const [notice, setNotice] = React.useState(null)
+        const [radiusCfg, setRadiusCfg] = React.useState(desiredRadius)
         React.useEffect(function () {
           return ctx.on('theme/change', function (snap) {
             setRevision(snap && typeof snap.revision === 'number' ? snap.revision : 0)
+            /* 亮暗切换后渐变需按新 scheme 重渲染（photo 主题双分支） */
+            if (typeof renderBodyGradientRef.fn === 'function') renderBodyGradientRef.fn()
           })
         }, [])
         const snap = theme.getTheme()
@@ -434,6 +430,7 @@ window.__ModuleLoader__.load({
           : (snap ? snap.preference : current)
         const label = {}
         for (const t of THEMES) label[t.id] = t.label
+        label[PHOTO_ID] = '我的取色主题'
         label.light = BUILTIN_LABELS.light
         label.dark = BUILTIN_LABELS.dark
         /* 新架构下「当前态」显示：官方 scheme（resolved）+ 是否有自定义层（desiredId） */
@@ -465,36 +462,111 @@ window.__ModuleLoader__.load({
           })
         }
 
-        const cards = THEMES.map(function (t) {
-          const active = desiredId === t.id
-          const swatches = t.swatch.map(function (c) {
-            return React.createElement('span', { key: c, className: 'tg-swatch', style: { background: c } })
-          })
+        /* QQ 调色盘式分组卡片渲染 */
+        const mkCard = (t, active, onPick) => {
           return React.createElement('button', {
             key: t.id,
             className: active ? 'tg-card tg-active' : 'tg-card',
-            onClick: function () { pick(t) }
+            onClick: onPick
           },
-            React.createElement('div', { className: 'tg-titleRow' },
-              React.createElement('span', { className: 'tg-title' }, t.label),
-              active ? React.createElement('span', { className: 'tg-badge' }, '使用中') : null),
-            React.createElement('div', { className: 'tg-swatches' }, swatches),
-            React.createElement('span', { className: 'tg-desc' }, t.desc)
-          )
+            React.createElement('div', { className: 'tg-canvas', style: { background: t.gradient || 'linear-gradient(135deg,#666,#888)' } },
+              active ? React.createElement('span', { className: 'tg-badge' }, '使用中') : null,
+              React.createElement('span', { className: 'tg-canvasLabel' },
+                React.createElement('span', { className: 'tg-title' + (t.lightLabel ? ' tg-titleDark' : '') }, t.label))),
+            React.createElement('span', { className: 'tg-desc' }, t.desc))
+        }
+
+        const groupSections = []
+        for (const g of GROUPS) {
+          const cards = THEMES.filter((t) => t.group === g.name).map((t) =>
+            mkCard(t, desiredId === t.id, () => pick(t)))
+          groupSections.push(React.createElement('div', { key: g.name, className: 'tg-group' },
+            React.createElement('div', { className: 'tg-groupTitle' },
+              React.createElement('span', { className: 'tg-groupName' }, g.name),
+              React.createElement('span', { className: 'tg-groupSub' }, g.sub)),
+            React.createElement('div', { className: 'tg-grid' }, cards)))
+        }
+
+        /* 我的取色（QQ「自选颜色」）：上传图片 → 提取主色 → 渐变主题 */
+        const [photoBusy, setPhotoBusy] = React.useState(false)
+        const pickPhoto = function (file) {
+          if (!file) return
+          setPhotoBusy(true)
+          paletteFromFile(file).then(function (palette) {
+            photoTheme = { palette, dark: buildPhotoTokens(palette, 'dark'), light: buildPhotoTokens(palette, 'light') }
+            desiredId = PHOTO_ID
+            applyChoice(PHOTO_ID)
+            /* palette 持久化到 settings（Host 端存色值，不存图） */
+            bridge.saveConfig({ photoPalette: palette }).then(function (reply) {
+              setPhotoBusy(false)
+              setNotice(reply && reply.ok
+                ? { err: null, ok: '取色主题已生成（' + palette.accent + '）并保存；亮/暗切换请用「外观」行' }
+                : { err: '主题已生效但保存失败（重启后会丢失取色）' })
+            }).catch(function () { setPhotoBusy(false); setNotice({ err: '主题已生效但保存失败' }) })
+            /* saveTheme 存 id；photo 的 token 从 palette 重建（palette 持久化即可重建 token） */
+            bridge.saveTheme(PHOTO_ID).catch(function () {})
+          }).catch(function (e) {
+            setPhotoBusy(false)
+            setNotice({ err: '取色失败：' + String((e && e.message) || e) })
+          })
+        }
+        const photoActive = desiredId === PHOTO_ID
+        const photoSection = React.createElement('div', { key: 'photo', className: 'tg-group' },
+          React.createElement('div', { className: 'tg-groupTitle' },
+            React.createElement('span', { className: 'tg-groupName' }, '我的取色'),
+            React.createElement('span', { className: 'tg-groupSub' }, '上传一张图片，提取主色生成专属渐变主题')),
+          React.createElement('div', { className: 'tg-grid' },
+            photoTheme || photoActive
+              ? mkCard(
+                { id: PHOTO_ID, label: photoTheme ? '主色 ' + photoTheme.palette.accent : '我的取色主题', desc: '图片提取的专属配色', gradient: photoTheme ? 'linear-gradient(135deg,' + photoTheme.palette.companionB + ',' + photoTheme.palette.accent + ' 55%,' + photoTheme.palette.companionA + ')' : 'linear-gradient(135deg,#f472b6,#38bdf8)', lightLabel: false },
+                photoActive,
+                function () { desiredId = PHOTO_ID; applyChoice(PHOTO_ID); bridge.saveTheme(PHOTO_ID).catch(function () {}) })
+              : null,
+            React.createElement('label', { key: 'photo-upload', className: 'tg-card', style: { cursor: 'pointer' } },
+              React.createElement('div', { className: 'tg-canvas tg-photoCard' },
+                React.createElement('span', { className: 'tg-canvasLabel' },
+                  React.createElement('span', { className: 'tg-title' }, photoBusy ? '取色中…' : '上传图片取色'))),
+              React.createElement('span', { className: 'tg-desc' }, '支持 png/jpg/webp，本地采样不上传'),
+              React.createElement('input', {
+                type: 'file', accept: '.png,.jpg,.jpeg,.webp',
+                style: { display: 'none' }, disabled: photoBusy,
+                onChange: function (e) { pickPhoto(e.target.files && e.target.files[0]); e.target.value = '' }
+              }))))
+
+        /* 全局圆角三档：保存即生效（独立于主题，保留的轻量外观能力） */
+        const pickRadius = function (v) {
+          setRadiusCfg(v)
+          bridge.saveConfig({ radius: { global: v } }).then(function (reply) {
+            if (reply && reply.ok === true) applyRadius(reply.radius)
+          }).catch(function () { /* 保存失败静默：下次刷新回读 */ })
+        }
+        const rdNow = radiusCfg && typeof radiusCfg.global === 'number' ? radiusCfg.global : -1
+        const radiusButtons = [['-1', '默认（跟随主题）'], ['0', '全锐角'], ['12', '圆润（12px）']].map(function (opt) {
+          const value = Number(opt[0])
+          const active = rdNow === value
+          return React.createElement('button', {
+            key: opt[0],
+            className: active ? 'tg-card tg-active tg-radiusBtn' : 'tg-card tg-radiusBtn',
+            onClick: function () { pickRadius(value) }
+          }, opt[1])
         })
 
         return React.createElement('div', { key: 'tg-r' + String(revision), className: 'tg-page' },
           React.createElement('p', { className: 'tg-head' }, '当前主题：' + currentLabel + '（点击卡片切换，选择自动保存）'),
           notice && notice.err ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-error-primary)' } }, notice.err) : null,
           notice && notice.ok ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-success-primary)' } }, notice.ok) : null,
-          React.createElement('div', { className: 'tg-grid' }, cards),
+          groupSections,
+          photoSection,
           React.createElement('p', { className: 'tg-head' },
-            '不用画廊主题了？',
+            '不用调色盘了？',
             ' ',
             React.createElement('button', {
               className: 'tg-release',
               onClick: release
-            }, '回到内置偏好（浅色/深色/跟随系统）'))
+            }, '回到官方默认配色（亮/暗请用「外观」行切换）')),
+          React.createElement('div', { className: 'tg-radiusRow' },
+            React.createElement('span', { className: 'tg-radiusLabel' }, '全局圆角'),
+            React.createElement('div', { className: 'tg-radiusBtns' }, radiusButtons))
         )
       }
     }
@@ -530,21 +602,48 @@ window.__ModuleLoader__.load({
       let overrideDispose = null
 
       function findTheme(id) {
+        if (id === PHOTO_ID && photoTheme) {
+          return { id: PHOTO_ID, colorScheme: 'dark', tokens: photoTheme.dark, label: '我的取色主题', desc: '从图片提取的专属配色' }
+        }
         for (const t of THEMES) if (t.id === id) return t
         return null
       }
 
-      /** 把一套主题 token（单 scheme）展开成官方覆盖层 pair。 */
+      /** 把一套主题 token（单 scheme）展开成官方覆盖层 pair。
+       *  photo 主题双 scheme 都有值（亮暗双套）；静态主题对侧回官方原值。 */
       function buildPair(t) {
         const pair = {}
+        if (t.id === PHOTO_ID && photoTheme) {
+          for (const [name, value] of Object.entries(photoTheme.dark)) {
+            pair[name] = { dark: value, light: photoTheme.light[name] || value }
+          }
+          return pair
+        }
         const officialSide = t.colorScheme === 'dark' ? OFFICIAL_LIGHT : OFFICIAL_DARK
         for (const [name, value] of Object.entries(t.tokens)) {
-          /* 对侧 scheme 覆盖成官方原值；本侧为主题值 */
           pair[name] = t.colorScheme === 'dark'
             ? { light: name in officialSide ? officialSide[name] : value, dark: value }
             : { dark: name in officialSide ? officialSide[name] : value, light: value }
         }
         return pair
+      }
+
+      /** photo 主题的 body 渐变渲染：--dshp-cu-body-gradient 已在 token 层生效，
+       *  这里把 body 背景替换成渐变（官方 body 无渐变概念，需 DOM 层补）。
+       *  同步挂到 ref 供 Gallery 的 theme/change 监听复调（亮暗切换重渲染）。 */
+      function renderBodyGradient() {
+        renderBodyGradientRef.fn = renderBodyGradient
+        const bgId = 'dshp-inx-custom-ui-body-gradient'
+        const old = document.getElementById(bgId)
+        if (old) old.remove()
+        const active = theme.getTheme()
+        if (!active || !active.active || !active.active.tokens) return
+        const grad = active.active.tokens['--dshp-cu-body-gradient']
+        if (!grad) return
+        const style = document.createElement('style')
+        style.id = bgId
+        style.textContent = 'body{background:' + grad + ' !important}'
+        document.head.appendChild(style)
       }
 
       /** 应用主题覆盖层 + 官方偏好切到主题 scheme。空 id = 撤销覆盖（回官方）。 */
@@ -555,22 +654,34 @@ window.__ModuleLoader__.load({
           if (t) {
             overrideDispose = theme.overrideTokens(OVERRIDE_SOURCE, buildPair(t))
             const pref = theme.getTheme().preference
-            if (pref !== t.colorScheme) theme.setTheme(t.colorScheme)
+            const scheme = t.id === PHOTO_ID
+              ? (pref === 'light' ? 'light' : 'dark') /* photo 双套跟随当前偏好方向 */
+              : t.colorScheme
+            if (pref !== scheme) theme.setTheme(scheme)
           }
+          renderBodyGradient()
         } catch (e) {
           console.error('[dshp-inx-custom-ui] 主题覆盖失败: ' + String(e && e.message))
         }
       }
 
-      /* 启动恢复：读 settings 持久化的 themeId，重建覆盖层（官方偏好已是
-       * 上次双写过的 scheme，或被外部改过——覆盖层都兼容，因为双分支常驻）。 */
+      /* 启动恢复：读 settings 持久化的 themeId 重建覆盖层；photo 主题从持久化
+       * palette 重建 token；同时恢复全局圆角。 */
       const bridge = createBridge()
       bridge.state().then(function (reply) {
-        const saved = reply && reply.ok === true && typeof reply.themeId === 'string' ? reply.themeId : ''
-        desiredId = saved
-        if (saved.length > 0) applyThemeChoice(saved)
+        if (reply && reply.ok === true) {
+          const saved = typeof reply.themeId === 'string' ? reply.themeId : ''
+          const pal = reply.photoPalette
+          if (pal && typeof pal.accent === 'string') {
+            photoTheme = { palette: pal, dark: buildPhotoTokens(pal, 'dark'), light: buildPhotoTokens(pal, 'light') }
+          }
+          desiredId = saved
+          if (saved.length > 0) applyThemeChoice(saved)
+          applyRadius(reply.radius)
+          desiredRadius = reply.radius && typeof reply.radius.global === 'number' ? reply.radius.global : -1
+        }
       }).catch(function (e) {
-        console.log('[dshp-inx-custom-ui] 读取持久化主题失败: ' + String((e && e.message) || e))
+        console.log('[dshp-inx-custom-ui] 读取持久化配置失败: ' + String((e && e.message) || e))
       })
 
       /* 插件停止时清覆盖层（ctx.effect 自动收回）。 */
@@ -582,124 +693,24 @@ window.__ModuleLoader__.load({
 
       const Gallery = createGallery(ctx, theme, bridge, applyThemeChoice)
 
-      /* 背景面板：保存后即时重渲染壁纸层（onChange 钩子） */
-      const BackgroundPanel = createBackgroundPanel(bridge, function (newCfg) {
-        renderBackground(newCfg.wallpaper, newCfg.glass, newCfg.radius)
-      })
-
-      /* 外观定制页 = 主题画廊 + 背景与外观，两块垂直堆叠 */
-      function AppearanceSection() {
-        return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '28px' } },
-          React.createElement(Gallery),
-          React.createElement(BackgroundPanel)
-        )
-      }
-
+      /* 外观定制页 = 主题画廊（全局圆角等仍在画廊尾部） */
       ctx.effect(function () {
         return slots.inject('settings.section', function () {
           return slots.register(
             { name: 'settings.section', id: 'dshp-inx-custom-ui', order: 50, label: '外观定制' },
-            AppearanceSection
+            Gallery
           )
         })
       }, 'custom-ui: settings section')
-
-      /* ── 背景与外观引擎：壁纸层 + 毛玻璃 + 全局圆角（配置驱动）── */
-      applyBackground(bridge.state())
-
-      /* 主题守护之外，配置变化（外部改 settings.yaml 热重载后手动刷新）也重应用背景 */
     }
 
-    /* ── 背景引擎：body 壁纸层（fixed，模糊/压暗滤镜），三栏半透明 + 毛玻璃，
-     *     全局圆角覆盖。所有 DOM 归本插件 effect 管理，停止即完全还原。 ── */
-    function applyBackground(statePromise) {
-      statePromise.then(function (cfg) {
-        if (!cfg || cfg.ok !== true) return
-        renderBackground(cfg.wallpaper, cfg.glass, cfg.radius)
-      }).catch(function (e) {
-        console.log('[dshp-inx-custom-ui] 读取背景配置失败: ' + String((e && e.message) || e))
-      })
-    }
-
-    function renderBackground(wallpaper, glass, radius) {
-      const layerId = 'dshp-inx-custom-ui-wallpaper'
-      const cssId = 'dshp-inx-custom-ui-bg-css'
-
-      /* 移除旧层与旧样式（幂等重渲染） */
-      const oldLayer = document.getElementById(layerId)
-      if (oldLayer) oldLayer.remove()
-      const oldCss = document.getElementById(cssId)
-      if (oldCss) oldCss.remove()
-
-      const wp = wallpaper || { type: 'none', file: '', blur: 0, dim: 0 }
-      const gl = glass || { enabled: false, strength: 14 }
-      const rd = radius || { global: -1 }
-      const hasWallpaper = wp.type !== 'none' && typeof wp.file === 'string' && wp.file.length > 0
-      const blurPx = Math.min(40, Math.max(0, Number(wp.blur) || 0))
-      const dimPct = Math.min(0.8, Math.max(0, Number(wp.dim) || 0))
-
-      /* 壁纸层：fixed 垫底，模糊压暗滤镜，cover 填充 */
-      if (hasWallpaper) {
-        const layer = document.createElement('div')
-        layer.id = layerId
-        layer.setAttribute('aria-hidden', 'true')
-        layer.style.cssText = [
-          'position:fixed', 'inset:0', 'z-index:0', 'pointer-events:none',
-          'overflow:hidden',
-          'filter:blur(' + blurPx + 'px)' + (blurPx > 0 ? ';transform:scale(1.' + Math.min(20, Math.ceil(blurPx / 2)) + ')' : ''),
-          dimPct > 0 ? ';background:#000' : '',
-          'background-position:center', 'background-repeat:no-repeat'
-        ].join(';')
-        if (wp.type === 'image') {
-          layer.style.backgroundImage = 'url("/ext/dshp-inx-custom-ui/file/' + encodeURIComponent(wp.file) + '")'
-          layer.style.backgroundSize = 'cover'
-          if (dimPct > 0) layer.style.opacity = String(1 - dimPct)
-        } else {
-          /* 动态壁纸：内嵌静音循环视频，同样吃 blur/dim */
-          const video = document.createElement('video')
-          video.autoplay = true
-          video.loop = true
-          video.muted = true
-          video.playsInline = true
-          video.setAttribute('playsinline', '')
-          video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover'
-          video.src = '/ext/dshp-inx-custom-ui/file/' + encodeURIComponent(wp.file)
-          if (dimPct > 0) video.style.opacity = String(1 - dimPct)
-          layer.appendChild(video)
-          layer.style.background = '#000'
-        }
-        document.body.prepend(layer)
-      }
-
-      /* 样式层：壁纸时压暗主框架底色并给三栏加毛玻璃；无壁纸时仅圆角生效。
-       * 类名取自 layout/settings/conversation 的 CSS module 实值（VOzbGW_/pI_x6G_/gdEzaW_）。 */
+    /* ── 全局圆角：独立于背景能力保留。-1 跟随主题；0 全锐角；N 统一圆润。 ── */
+    function applyRadius(radius) {
+      const cssId = 'dshp-inx-custom-ui-radius-css'
+      const old = document.getElementById(cssId)
+      if (old) old.remove()
+      const r = Number(radius && radius.global)
       const css = []
-      if (hasWallpaper) {
-        /* frame/中间栏透明，露出 body 壁纸层；body 兜底深色防白闪 */
-        css.push('body{background:#101014 !important}')
-        css.push('.pI_x6G_frame{background:transparent !important}')
-        const glassOn = gl.enabled === true
-        /* color-mix 的第二个分量必须是 62% 这样的百分比——之前传 0.72 导致整条
-         * 声明非法，三栏背景没变透明，壁纸看起来"不生效"。 */
-        const alphaPct = glassOn ? 62 : 85
-        const colBg = (token) => 'color-mix(in srgb, ' + token + ' ' + alphaPct + '%, transparent)'
-        /* 毛玻璃必须放在 ::before 伪元素上，绝不能放在 sidebarCol/detailsCol 元素自身：
-         * backdrop-filter 会把元素变成其内 position:fixed 后代的包含块——
-         * 设置 dialog（.VOzbGW_overlay fixed）渲染在 sidebar 树内（SettingsRoot
-         * 挂 sidebar.settings 槽），一旦 sidebarCol 自带 backdrop-filter，
-         * dialog 的定位基准就从视口变成侧栏列，整个面板被压进侧栏（真实翻车案例）。
-         * 伪元素不构成 fixed 后代的包含块，安全。 */
-        const glassBefore = (selector, token) => selector + '::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none'
-          + (glassOn ? ';backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)' : '')
-          + ';background:' + colBg(token) + '}'
-        css.push('.pI_x6G_sidebarCol,.pI_x6G_detailsCol,.pI_x6G_centerCol{position:relative;background:transparent !important}')
-        css.push(glassBefore('.pI_x6G_sidebarCol', 'var(--dsw-specific-sidebar-fill)'))
-        css.push(glassBefore('.pI_x6G_detailsCol', 'var(--dsw-alias-bg-layer-1)'))
-        /* 会话内容区也透出壁纸（浅覆盖，保证气泡可读） */
-        css.push('.pI_x6G_centerCol::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:color-mix(in srgb, var(--dsw-alias-bg-base) ' + (glassOn ? 30 : 55) + '%, transparent)}')
-      }
-      /* 全局圆角：-1 跟随主题；0 全锐角；12 统一圆润。 */
-      const r = Number(rd.global)
       if (Number.isFinite(r)) {
         if (r === 0) {
           css.push([
