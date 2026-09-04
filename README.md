@@ -54,8 +54,19 @@ ln -s /home/yinxin/.dsh/plugins/dsh-custom-ui node_modules/@dshp-inx/custom-ui
 
 ## 使用
 
-设置 → 主题画廊：色卡预览 + 点击即切，`theme/change` 事件驱动"使用中"
-徽标实时跟随；内置浅色/深色也可在画廊顶部查看当前态并随时切回。
+设置 → 外观定制（两块）：
+
+- **主题画廊**：色卡预览 + 点击即切，`theme/change` 事件驱动"使用中"
+  徽标实时跟随；内置浅色/深色也可在画廊顶部查看当前态并随时切回。
+- **背景与外观**：壁纸上传（图片 ≤24MB：png/jpg/gif/webp/avif/bmp；视频
+  ≤96MB：mp4/webm）、文件列表选择/删除、模糊度（0–40px）、压暗度（0–80%）、
+  侧栏与详情栏毛玻璃（0–40px 强度）、全局圆角（-1 默认 / 0 全锐角 / 1–24 上限）。
+  保存即生效，无需刷新。
+
+壁纸层为 body 下 fixed 层（z-index:0，pointer-events:none），视频壁纸
+静音循环 playsInline；三栏背景改为 `color-mix` 半透明 + `backdrop-filter`
+实现毛玻璃，透明度随玻璃强度联动；全部 DOM 与样式节点带 id，重渲染幂等，
+插件停止即完全还原。
 
 ## 持久化
 

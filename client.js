@@ -189,7 +189,183 @@ window.__ModuleLoader__.load({
       { id: 'github-light', colorScheme: 'light', tokens: githubLight, label: 'GitHub 亮色 Primer', desc: '纯白 + #0969da + 绿色按钮', swatch: ['#ffffff', '#f6f8fa', '#0969da', '#1f883d'] }
     ]
 
-    const BUILTIN_LABELS = { light: '浅色（内置）', dark: '深色（内置）' }
+    /* ── 设置页：背景与外观卡片（壁纸上传/选择/删除 + 模糊/压暗/毛玻璃/圆角）── */
+    function createBackgroundPanel(bridge, onChange) {
+      return function BackgroundPanel() {
+        const [cfg, setCfg] = React.useState(null)
+        const [files, setFiles] = React.useState([])
+        const [busy, setBusy] = React.useState(false)
+        const [notice, setNotice] = React.useState(null)
+
+        const reload = React.useCallback(function () {
+          bridge.state().then(function (reply) {
+            if (reply && reply.ok === true) {
+              setCfg({ wallpaper: reply.wallpaper, glass: reply.glass, radius: reply.radius })
+              setNotice(null)
+            } else {
+              setNotice({ err: (reply && reply.error) || '状态读取失败' })
+            }
+          }).catch(function (e) { setNotice({ err: '状态读取失败：' + String((e && e.message) || e) }) })
+          fetch('/ext/dshp-inx-custom-ui/wallpapers').then(function (r) { return r.json() }).then(function (reply) {
+            if (reply && reply.ok === true) setFiles(reply.files || [])
+          }).catch(function () { /* 列表失败不阻塞 */ })
+        }, [])
+        React.useEffect(function () { reload() }, [reload])
+
+        const save = function (patch) {
+          setBusy(true)
+          bridge.saveConfig(patch).then(function (reply) {
+            setBusy(false)
+            if (reply && reply.ok === true) {
+              setCfg({ wallpaper: reply.wallpaper, glass: reply.glass, radius: reply.radius })
+              if (onChange) onChange(reply)
+              setNotice({ ok: '已保存' })
+            } else {
+              setNotice({ err: (reply && reply.error) || '保存失败' })
+            }
+          }).catch(function (e) {
+            setBusy(false)
+            setNotice({ err: '保存失败：' + String((e && e.message) || e) })
+          })
+        }
+
+        const upload = function (file) {
+          if (!file) return
+          setBusy(true)
+          setNotice(null)
+          const form = new FormData()
+          form.append('file', file, file.name)
+          fetch('/ext/dshp-inx-custom-ui/wallpaper', { method: 'POST', body: form }).then(function (r) { return r.json() }).then(function (reply) {
+            setBusy(false)
+            if (reply && reply.ok === true) {
+              const isVideo = /\.(mp4|webm)$/i.test(reply.name)
+              save({ wallpaper: { type: isVideo ? 'video' : 'image', file: reply.name, blur: (cfg && cfg.wallpaper && cfg.wallpaper.blur) || 0, dim: (cfg && cfg.wallpaper && cfg.wallpaper.dim) || 0 } })
+              reload()
+            } else {
+              setNotice({ err: (reply && reply.error) || '上传失败' })
+            }
+          }).catch(function (e) {
+            setBusy(false)
+            setNotice({ err: '上传失败：' + String((e && e.message) || e) })
+          })
+        }
+
+        const del = function (name) {
+          setBusy(true)
+          fetch('/ext/dshp-inx-custom-ui/wallpaper-delete', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name })
+          }).then(function (r) { return r.json() }).then(function (reply) {
+            setBusy(false)
+            if (reply && reply.ok === true) reload()
+            else setNotice({ err: (reply && reply.error) || '删除失败' })
+          }).catch(function (e) {
+            setBusy(false)
+            setNotice({ err: '删除失败：' + String((e && e.message) || e) })
+          })
+        }
+
+        if (cfg === null) {
+          return React.createElement('p', { className: 'tg-head' }, '读取配置中…')
+        }
+
+        const wp = cfg.wallpaper || { type: 'none', file: '', blur: 0, dim: 0 }
+        const gl = cfg.glass || { enabled: false, strength: 14 }
+        const rd = cfg.radius || { global: -1 }
+
+        const sliders = []
+        const mkSlider = function (label, value, min, max, step, onInput) {
+          return React.createElement('label', { key: label, style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary)' } },
+            React.createElement('span', { style: { width: '72px', flex: 'none' } }, label),
+            React.createElement('input', {
+              type: 'range', min: String(min), max: String(max), step: String(step),
+              value: String(value), disabled: busy,
+              style: { flex: '1' },
+              onChange: function (e) { onInput(Number(e.target.value)) }
+            }),
+            React.createElement('span', { style: { width: '40px', textAlign: 'right', flex: 'none' } }, String(value))
+          )
+        }
+
+        const wpPatch = function (patch) {
+          save({ wallpaper: Object.assign({}, wp, patch) })
+        }
+
+        return React.createElement('div', { className: 'tg-page' },
+          React.createElement('p', { className: 'tg-head' }, '壁纸与视觉效果（选择即时保存）'),
+          notice && notice.err ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-error-primary)' } }, notice.err) : null,
+          notice && notice.ok ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-success-primary)' } }, notice.ok) : null,
+
+          /* 壁纸选择行 */
+          React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' } },
+            React.createElement('button', {
+              className: 'tg-card' + (wp.type === 'none' ? ' tg-active' : ''), style: { padding: '8px 12px' },
+              disabled: busy,
+              onClick: function () { wpPatch({ type: 'none', file: '' }) }
+            }, '无壁纸'),
+            React.createElement('label', { className: 'tg-card', style: { padding: '8px 12px', cursor: 'pointer' } },
+              busy ? '处理中…' : '上传壁纸（图片 ≤24MB / 视频 ≤96MB）',
+              React.createElement('input', {
+                type: 'file',
+                accept: '.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp,.mp4,.webm',
+                style: { display: 'none' },
+                disabled: busy,
+                onChange: function (e) { upload(e.target.files && e.target.files[0]) }
+              }))
+          ),
+
+          /* 文件列表 */
+          files.length > 0 ? React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+            files.map(function (f) {
+              const active = wp.file === f.name && wp.type !== 'none'
+              const icon = f.type === 'video' ? '🎬' : '🖼️'
+              return React.createElement('span', { key: f.name, style: { display: 'inline-flex', gap: '6px', alignItems: 'center', padding: '6px 10px', borderRadius: '8px', border: active ? '2px solid var(--dsw-alias-brand-primary)' : '1px solid var(--dsw-alias-border-l1)', background: active ? 'var(--dsw-alias-interactive-bg-hover-accent)' : 'var(--dsw-alias-bg-layer-1)', fontSize: '12px' } },
+                icon,
+                React.createElement('button', {
+                  style: { border: 'none', background: 'none', color: 'inherit', cursor: 'pointer', font: 'inherit', padding: 0 },
+                  onClick: function () { wpPatch({ type: f.type, file: f.name }) }
+                }, f.name),
+                React.createElement('span', { style: { color: 'var(--dsw-alias-label-tertiary)' } }, Math.round(f.size / 1024) + 'K'),
+                React.createElement('button', {
+                  style: { border: 'none', background: 'none', color: 'var(--dsw-alias-state-error-primary)', cursor: 'pointer', padding: 0, font: 'inherit' },
+                  disabled: busy,
+                  onClick: function () { del(f.name) }
+                }, '✕'))
+            })
+          ) : null,
+
+          /* 模糊 / 压暗 */
+          wp.type !== 'none' ? React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+            mkSlider('模糊度', wp.blur || 0, 0, 40, 1, function (v) { wpPatch({ blur: v }) }),
+            mkSlider('压暗度', wp.dim || 0, 0, 0.8, 0.05, function (v) { wpPatch({ dim: v }) })
+          ) : null,
+
+          /* 毛玻璃 */
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '12px' } },
+            React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary)', cursor: 'pointer' } },
+              React.createElement('input', {
+                type: 'checkbox', checked: gl.enabled === true, disabled: busy,
+                onChange: function (e) { save({ glass: Object.assign({}, gl, { enabled: e.target.checked }) }) }
+              }),
+              '侧栏与详情栏毛玻璃（需壁纸生效）'
+            ),
+            gl.enabled === true && wp.type !== 'none' ? mkSlider('玻璃强度', gl.strength || 14, 0, 40, 1, function (v) {
+              save({ glass: Object.assign({}, gl, { strength: v }) })
+            }) : null
+          ),
+
+          /* 全局圆角 */
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: '12px' } },
+            mkSlider('全局圆角', rd.global === -1 ? -1 : rd.global, -1, 24, 1, function (v) {
+              save({ radius: { global: v } })
+            }),
+            React.createElement('p', { className: 'tg-head' }, '−1 = 默认（跟随主题）· 0 = 全锐角 · 1–24 = 统一上限（气泡/面板/按钮）')
+          )
+        )
+      }
+    }
+
 
     /* ── 持久化守护状态：当前生效的自定义主题 id（空 = 跟随内置偏好）──
      * 官方 theme runtime 的 adopt() 订阅共享 settings 镜像，任何 settings
@@ -213,7 +389,15 @@ window.__ModuleLoader__.load({
         })
         return response.json()
       }
-      return { state, saveTheme }
+      const saveConfig = async (patch) => {
+        const response = await fetch('/ext/dshp-inx-custom-ui/config', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(patch || {})
+        })
+        return response.json()
+      }
+      return { state, saveTheme, saveConfig }
     }
 
     /* ── 画廊组件：theme/change 驱动实时高亮 ── */
@@ -344,15 +528,134 @@ window.__ModuleLoader__.load({
       }, 'custom-ui: preference guard')
 
       const Gallery = createGallery(ctx, theme, bridge)
+
+      /* 背景面板：保存后即时重渲染壁纸层（onChange 钩子） */
+      const BackgroundPanel = createBackgroundPanel(bridge, function (newCfg) {
+        renderBackground(newCfg.wallpaper, newCfg.glass, newCfg.radius)
+      })
+
+      /* 外观定制页 = 主题画廊 + 背景与外观，两块垂直堆叠 */
+      function AppearanceSection() {
+        return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '28px' } },
+          React.createElement(Gallery),
+          React.createElement(BackgroundPanel)
+        )
+      }
+
       ctx.effect(function () {
         return slots.inject('settings.section', function () {
           return slots.register(
-            { name: 'settings.section', id: 'dshp-inx-custom-ui', order: 50, label: '主题画廊' },
-            Gallery
+            { name: 'settings.section', id: 'dshp-inx-custom-ui', order: 50, label: '外观定制' },
+            AppearanceSection
           )
         })
       }, 'custom-ui: settings section')
+
+      /* ── 背景与外观引擎：壁纸层 + 毛玻璃 + 全局圆角（配置驱动）── */
+      applyBackground(bridge.state())
+
+      /* 主题守护之外，配置变化（外部改 settings.yaml 热重载后手动刷新）也重应用背景 */
     }
+
+    /* ── 背景引擎：body 壁纸层（fixed，模糊/压暗滤镜），三栏半透明 + 毛玻璃，
+     *     全局圆角覆盖。所有 DOM 归本插件 effect 管理，停止即完全还原。 ── */
+    function applyBackground(statePromise) {
+      statePromise.then(function (cfg) {
+        if (!cfg || cfg.ok !== true) return
+        renderBackground(cfg.wallpaper, cfg.glass, cfg.radius)
+      }).catch(function (e) {
+        console.log('[dshp-inx-custom-ui] 读取背景配置失败: ' + String((e && e.message) || e))
+      })
+    }
+
+    function renderBackground(wallpaper, glass, radius) {
+      const layerId = 'dshp-inx-custom-ui-wallpaper'
+      const cssId = 'dshp-inx-custom-ui-bg-css'
+
+      /* 移除旧层与旧样式（幂等重渲染） */
+      const oldLayer = document.getElementById(layerId)
+      if (oldLayer) oldLayer.remove()
+      const oldCss = document.getElementById(cssId)
+      if (oldCss) oldCss.remove()
+
+      const wp = wallpaper || { type: 'none', file: '', blur: 0, dim: 0 }
+      const gl = glass || { enabled: false, strength: 14 }
+      const rd = radius || { global: -1 }
+      const hasWallpaper = wp.type !== 'none' && typeof wp.file === 'string' && wp.file.length > 0
+      const blurPx = Math.min(40, Math.max(0, Number(wp.blur) || 0))
+      const dimPct = Math.min(0.8, Math.max(0, Number(wp.dim) || 0))
+
+      /* 壁纸层：fixed 垫底，模糊压暗滤镜，cover 填充 */
+      if (hasWallpaper) {
+        const layer = document.createElement('div')
+        layer.id = layerId
+        layer.setAttribute('aria-hidden', 'true')
+        layer.style.cssText = [
+          'position:fixed', 'inset:0', 'z-index:0', 'pointer-events:none',
+          'overflow:hidden',
+          'filter:blur(' + blurPx + 'px)' + (blurPx > 0 ? ';transform:scale(1.' + Math.min(20, Math.ceil(blurPx / 2)) + ')' : ''),
+          dimPct > 0 ? ';background:#000' : '',
+          'background-position:center', 'background-repeat:no-repeat'
+        ].join(';')
+        if (wp.type === 'image') {
+          layer.style.backgroundImage = 'url("/ext/dshp-inx-custom-ui/file/' + encodeURIComponent(wp.file) + '")'
+          layer.style.backgroundSize = 'cover'
+          if (dimPct > 0) layer.style.opacity = String(1 - dimPct)
+        } else {
+          /* 动态壁纸：内嵌静音循环视频，同样吃 blur/dim */
+          const video = document.createElement('video')
+          video.autoplay = true
+          video.loop = true
+          video.muted = true
+          video.playsInline = true
+          video.setAttribute('playsinline', '')
+          video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover'
+          video.src = '/ext/dshp-inx-custom-ui/file/' + encodeURIComponent(wp.file)
+          if (dimPct > 0) video.style.opacity = String(1 - dimPct)
+          layer.appendChild(video)
+          layer.style.background = '#000'
+        }
+        document.body.prepend(layer)
+      }
+
+      /* 样式层：壁纸时压暗主框架底色并给三栏加毛玻璃；无壁纸时仅圆角生效。
+       * 类名取自 layout/settings/conversation 的 CSS module 实值（VOzbGW_/pI_x6G_/gdEzaW_）。 */
+      const css = []
+      if (hasWallpaper) {
+        css.push('.pI_x6G_frame{background:transparent !important}')
+        css.push('.pI_x6G_centerCol{background:transparent !important}')
+        const glassOn = gl.enabled === true
+        const blurStrength = Math.min(40, Math.max(0, Number(gl.strength) || 0))
+        const alpha = glassOn ? Math.min(0.85, 0.3 + blurStrength / 100) : 0.72
+        const applyGlass = (selector, base) => selector + '{background:' + base.replace('{A}', String(alpha.toFixed(2))) + (glassOn && blurStrength > 0 ? '!important;backdrop-filter:blur(' + blurStrength + 'px) saturate(1.2);-webkit-backdrop-filter:blur(' + blurStrength + 'px) saturate(1.2)' : '!important') + '}'
+        /* 三栏走主题底色半透明——保持换主题时观感一致 */
+        css.push(applyGlass('.pI_x6G_sidebarCol', 'color-mix(in srgb, var(--dsw-specific-sidebar-fill) {A}, transparent)'))
+        css.push(applyGlass('.pI_x6G_detailsCol', 'color-mix(in srgb, var(--dsw-alias-bg-layer-1) {A}, transparent)'))
+        /* 会话流本体透明，让气泡悬浮于壁纸上 */
+        css.push('.pI_x6G_centerCol{background:transparent !important}')
+      }
+      /* 全局圆角：-1 不动；0 全锐角；N 上限截断（大圆角面收敛到 N，小圆角保留）。 */
+      const r = Number(rd.global)
+      if (Number.isFinite(r)) {
+        if (r === 0) {
+          css.push([
+            '.gdEzaW_bubble', '.VOzbGW_panel', '.VOzbGW_navCell', '.VOzbGW_close',
+            'button', 'input', 'textarea', 'select', '[class*="_card"]', '[class*="_bubble"]'
+          ].join(',') + '{border-radius:0 !important}')
+        } else if (r > 0) {
+          css.push([
+            '.gdEzaW_bubble', '.VOzbGW_panel', '.VOzbGW_navCell', '.VOzbGW_close'
+          ].join(',') + '{border-radius:' + Math.min(24, r) + 'px !important}')
+        }
+      }
+      if (css.length > 0) {
+        const style = document.createElement('style')
+        style.id = cssId
+        style.textContent = css.join('\n')
+        document.head.appendChild(style)
+      }
+    }
+
 
     return module.exports
   }
