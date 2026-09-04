@@ -430,7 +430,16 @@ window.__ModuleLoader__.load({
 
         const pick = function (t) {
           desiredId = t.id
-          try { theme.setTheme(t.id) } catch (e) { console.error(String(e && e.message)) }
+          /* 双写策略：
+           * 1) 先把内置 scheme 写进官方 ui-theme.preference（走 setTheme 正规通道）——
+           *    官方 adopt() 触发时读到的偏好与自定义主题同色系，恢复也不会亮暗跳变；
+           * 2) 再切自定义 id（内存生效）。 */
+          try {
+            if (t.colorScheme === 'light' || t.colorScheme === 'dark') {
+              if (theme.getTheme().preference !== t.colorScheme) theme.setTheme(t.colorScheme)
+            }
+            theme.setTheme(t.id)
+          } catch (e) { console.error(String(e && e.message)) }
           bridge.saveTheme(t.id).then(function (reply) {
             setNotice(reply && reply.ok ? null : { err: (reply && reply.error) || '主题选择保存失败（重启后会回到内置偏好）' })
           }).catch(function (e) {
@@ -531,11 +540,29 @@ window.__ModuleLoader__.load({
           const activeId = snap && snap.active ? snap.active.id : ''
           if (activeId !== desiredId) {
             try { theme.setTheme(desiredId) } catch (e) {
-              console.log('[dshp-inx-custom-ui] 守护重应用失败: ' + String(e && e.message))
+              console.error('[dshp-inx-custom-ui] 守护重应用失败: ' + String(e && e.message))
             }
           }
         })
       }, 'custom-ui: preference guard')
+
+      /* 启动自愈：恢复后短窗口内核对三次（原生 setTimeout，dispose 清理）。
+       * 第一次 apply 后镜像可能还有一轮 adopt 在途，单次 setTheme 可能被盖；
+       * 短周期重试兜住这一窗口，之后完全交给 theme/change 守护。 */
+      ctx.effect(function () {
+        const checks = [300, 900, 2000]
+        const timers = checks.map(function (delay) {
+          return setTimeout(function () {
+            if (desiredId.length === 0) return
+            try {
+              const snapNow = theme.getTheme()
+              const activeId = snapNow && snapNow.active ? snapNow.active.id : ''
+              if (activeId !== desiredId) theme.setTheme(desiredId)
+            } catch (e) { /* 注册不匹配等启动竞态：跳过本轮 */ }
+          }, delay)
+        })
+        return function () { for (const t of timers) clearTimeout(t) }
+      }, 'custom-ui: startup settle guard')
 
       const Gallery = createGallery(ctx, theme, bridge)
 
