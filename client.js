@@ -374,16 +374,23 @@ window.__ModuleLoader__.load({
     }
 
 
-    /* ── 持久化守护状态：当前生效的自定义主题 id（空 = 跟随内置偏好）──
-     * 官方 theme runtime 的 adopt() 订阅共享 settings 镜像，任何 settings
-     * 写入（含本插件保存 themeId、其它插件写配置）都会把内存里的自定义
-     * 偏好重置回 ui-theme.preference。守护监听 theme/change，在被重置的
-     * 同一个同步事件链里重新应用持久化主题，避免"先跳回默认配色、
-     * 要点两次"（重置+重应用发生在同一 JS 任务内，绘制前完成，无闪烁）。 */
+    /* ── 持久化主题选择：非空 = 有自定义覆盖层在生效（见 apply 的覆盖层架构）── */
     let desiredId = ''
 
     /* 内置主题的画廊显示名（light/dark 也能在画廊里被切回）。 */
     const BUILTIN_LABELS = { light: '浅色（内置）', dark: '深色（内置）' }
+
+    /* 官方样式表的原始 alias/specific token 值（无操作覆盖用）。
+     * 来源：dsh-client-ui-theme 的 body 与 body[data-ds-dark-theme] 规则。
+     * 覆盖层的对侧 scheme 分支填这些 var() 引用 —— 用户在官方亮/暗之间切换时，
+     * 覆盖层自动呈现对侧官方原值，等于"没有覆盖"。 */
+    const OFFICIAL_LIGHT = {
+      "--dsw-alias-bg-base": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-bg-layer-1": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-bg-layer-2": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-bg-layer-3": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-bg-mask-1": "#0000003d", "--dsw-alias-bg-mask-2": "#0000001f", "--dsw-alias-bg-mask-3": "#0000007a", "--dsw-alias-bg-mask-photo": "#000000e0", "--dsw-alias-bg-mask-drop": "#ffffffb3", "--dsw-alias-bg-module-platform": "var(--dsw-static-neutral-bluish-60)", "--dsw-alias-bg-multi-select": "var(--dsw-static-neutral-bluish-60)", "--dsw-alias-bg-overlay": "var(--dsw-static-neutral-bluish-150)", "--dsw-alias-bg-skeleton": "#0000000a", "--dsw-alias-border-inverted2": "#0000", "--dsw-alias-border-inverted": "#0000", "--dsw-alias-border-l1": "#0000000a", "--dsw-alias-border-l2-darkmode-thin": "#0000001a", "--dsw-alias-border-l2": "#0000001a", "--dsw-alias-border-l3": "#0000001f", "--dsw-alias-border-l4": "#00000029", "--dsw-alias-brand-primary-invert": "var(--dsw-static-neutral-bluish-1000)", "--dsw-alias-brand-primary": "var(--dsw-static-neutral-bluish-1000)", "--dsw-alias-brand-text": "var(--dsw-static-neutral-bluish-1000)", "--dsw-alias-button-contrast-fill": "var(--dsw-static-neutral-bluish-700)", "--dsw-alias-button-elevated-fill": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-button-floating-fill": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-button-floating-hover": "var(--dsw-static-neutral-bluish-75)", "--dsw-alias-button-ghost-active-border": "var(--dsw-static-neutral-bluish-500)", "--dsw-alias-button-ghost-active-fill": "var(--dsw-static-neutral-bluish-100)", "--dsw-alias-button-ghost-active-hover": "var(--dsw-static-neutral-bluish-150)", "--dsw-alias-button-info-fill": "var(--dsw-static-deepseek-500)", "--dsw-alias-button-info-hover": "var(--dsw-static-deepseek-400)", "--dsw-alias-button-primary-dimmed": "var(--dsw-static-neutral-bluish-100)", "--dsw-alias-button-primary-fill": "var(--dsw-alias-brand-primary)", "--dsw-alias-button-primary-hover": "var(--dsw-static-neutral-bluish-750)", "--dsw-alias-button-tool-bar-fill-invisible": "#1f1f1f5c", "--dsw-alias-button-tool-bar-fill": "#54555780", "--dsw-alias-button-tool-bar-hover": "#54555799", "--dsw-alias-interactive-bg-active": "#2631481a", "--dsw-alias-interactive-bg-hover-accent": "#26314824", "--dsw-alias-interactive-bg-hover-danger": "#ec13130d", "--dsw-alias-interactive-bg-hover-solid": "var(--dsw-static-neutral-bluish-75)", "--dsw-alias-interactive-bg-hover": "#2631480f", "--dsw-alias-label-caption": "var(--dsw-static-neutral-bluish-400)", "--dsw-alias-label-dimmed": "var(--dsw-static-neutral-bluish-200)", "--dsw-alias-label-primary-bluish": "var(--dsw-static-blue-900)", "--dsw-alias-label-primary-dimmed": "var(--dsw-static-neutral-bluish-950)", "--dsw-alias-label-primary-foreground": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-label-primary-inverted": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-label-primary": "var(--dsw-static-neutral-bluish-1000)", "--dsw-alias-label-secondary": "var(--dsw-static-neutral-bluish-700)", "--dsw-alias-label-tertiary": "var(--dsw-static-neutral-bluish-600)", "--dsw-alias-markdown-citation": "var(--dsw-static-neutral-bluish-100)", "--dsw-alias-markdown-code-block-banner": "var(--dsw-static-neutral-bluish-50)", "--dsw-alias-markdown-code-block": "var(--dsw-static-neutral-bluish-50)", "--dsw-alias-markdown-code-segment-selected": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-markdown-code-segment-unselected": "var(--dsw-static-neutral-bluish-75)", "--dsw-alias-markdown-inline-code": "var(--dsw-static-neutral-bluish-100)", "--dsw-alias-markdown-placeholder": "var(--dsw-static-neutral-bluish-60)", "--dsw-alias-markdown-tag": "var(--dsw-static-neutral-bluish-75)", "--dsw-alias-scrollbar-bg-l1": "var(--dsw-static-neutral-200)", "--dsw-alias-scrollbar-bg-l2": "var(--dsw-static-neutral-200)", "--dsw-alias-scrollbar-hover-l1": "var(--dsw-static-neutral-300)", "--dsw-alias-scrollbar-hover-l2": "var(--dsw-static-neutral-300)", "--dsw-alias-state-business-primary": "var(--dsw-static-deepseek-500)", "--dsw-alias-state-business-tertiary": "var(--dsw-static-deepseek-100)", "--dsw-alias-state-error-primary": "var(--dsw-static-red-600)", "--dsw-alias-state-error-secondary": "var(--dsw-static-red-400)", "--dsw-alias-state-success-primary": "var(--dsw-static-green-500)", "--dsw-alias-state-success-secondary": "var(--dsw-static-green-400)", "--dsw-alias-state-success-tertiary": "var(--dsw-static-green-100)", "--dsw-alias-state-warn-label": "var(--dsw-static-amber-600)", "--dsw-alias-state-warn-primary": "var(--dsw-static-amber-500)", "--dsw-alias-state-warn-secondary": "var(--dsw-static-amber-400)", "--dsw-alias-state-warn-tertiary": "var(--dsw-static-amber-100)", "--dsw-alias-toast-bg": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-tooltip-bg": "var(--dsw-static-neutral-bluish-850)", "--dsw-specific-bubble-highlight": "var(--dsw-static-deepseek-200)", "--dsw-specific-bubble": "var(--dsw-static-deepseek-50)", "--dsw-specific-input-major": "var(--dsw-static-neutral-bluish-00)", "--dsw-specific-login-input": "var(--dsw-static-neutral-bluish-50)", "--dsw-specific-menu": "var(--dsw-alias-bg-layer-3)", "--dsw-specific-selector": "var(--dsw-static-neutral-bluish-60)", "--dsw-specific-sidebar-fill": "var(--dsw-static-neutral-bluish-50)", "--dsw-specific-sidebar-nav-item-active-accent": "var(--dsw-static-deepseek-100)", "--dsw-specific-sidebar-nav-item-active": "var(--dsw-static-neutral-bluish-100)", "--dsw-specific-sidebar-nav-item-hover": "var(--dsw-static-neutral-bluish-75)", "--dsw-specific-tip": "var(--dsw-static-neutral-bluish-60)"
+    }
+    const OFFICIAL_DARK = {
+      "--dsw-alias-bg-base": "var(--dsw-static-neutral-bluish-950)", "--dsw-alias-bg-layer-1": "var(--dsw-static-neutral-bluish-900)", "--dsw-alias-bg-layer-2": "var(--dsw-static-neutral-bluish-850)", "--dsw-alias-bg-layer-3": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-bg-mask-1": "#ffffff1a", "--dsw-alias-bg-mask-2": "#ffffff0f", "--dsw-alias-bg-mask-3": "#ffffff4d", "--dsw-alias-bg-mask-photo": "#000000e0", "--dsw-alias-bg-mask-drop": "#ffffff33", "--dsw-alias-bg-module-platform": "var(--dsw-static-neutral-bluish-900)", "--dsw-alias-bg-multi-select": "var(--dsw-static-neutral-bluish-850)", "--dsw-alias-bg-overlay": "var(--dsw-static-neutral-bluish-850)", "--dsw-alias-bg-skeleton": "#ffffff0d", "--dsw-alias-border-inverted2": "#0000", "--dsw-alias-border-inverted": "#0000", "--dsw-alias-border-l1": "#ffffff12", "--dsw-alias-border-l2-darkmode-thin": "#ffffff14", "--dsw-alias-border-l2": "#ffffff1f", "--dsw-alias-border-l3": "#ffffff29", "--dsw-alias-border-l4": "#ffffff33", "--dsw-alias-brand-primary-invert": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-brand-primary": "var(--dsw-static-deepseek-400)", "--dsw-alias-brand-text": "var(--dsw-static-deepseek-400)", "--dsw-alias-button-contrast-fill": "var(--dsw-static-neutral-bluish-100)", "--dsw-alias-button-elevated-fill": "var(--dsw-static-neutral-bluish-900)", "--dsw-alias-button-floating-fill": "var(--dsw-static-neutral-bluish-850)", "--dsw-alias-button-floating-hover": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-button-ghost-active-border": "var(--dsw-static-neutral-bluish-600)", "--dsw-alias-button-ghost-active-fill": "var(--dsw-static-neutral-bluish-850)", "--dsw-alias-button-ghost-active-hover": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-button-info-fill": "var(--dsw-static-deepseek-400)", "--dsw-alias-button-info-hover": "var(--dsw-static-deepseek-300)", "--dsw-alias-button-primary-dimmed": "var(--dsw-static-deepseek-600)", "--dsw-alias-button-primary-fill": "var(--dsw-alias-brand-primary)", "--dsw-alias-button-primary-hover": "var(--dsw-static-deepseek-450)", "--dsw-alias-button-tool-bar-fill-invisible": "#54555799", "--dsw-alias-button-tool-bar-fill": "#54555780", "--dsw-alias-button-tool-bar-hover": "#54555799", "--dsw-alias-interactive-bg-active": "#5686fe29", "--dsw-alias-interactive-bg-hover-accent": "#5686fe33", "--dsw-alias-interactive-bg-hover-danger": "#f25a5a33", "--dsw-alias-interactive-bg-hover-solid": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-interactive-bg-hover": "#5686fe1f", "--dsw-alias-label-caption": "var(--dsw-static-neutral-bluish-500)", "--dsw-alias-label-dimmed": "var(--dsw-static-neutral-bluish-600)", "--dsw-alias-label-primary-bluish": "var(--dsw-static-blue-100)", "--dsw-alias-label-primary-dimmed": "var(--dsw-static-neutral-bluish-50)", "--dsw-alias-label-primary-foreground": "var(--dsw-static-neutral-bluish-950)", "--dsw-alias-label-primary-inverted": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-label-primary": "var(--dsw-static-neutral-bluish-00)", "--dsw-alias-label-secondary": "var(--dsw-static-neutral-bluish-100)", "--dsw-alias-label-tertiary": "var(--dsw-static-neutral-bluish-600)", "--dsw-alias-markdown-citation": "var(--dsw-static-deepseek-400)", "--dsw-alias-markdown-code-block-banner": "var(--dsw-static-neutral-bluish-900)", "--dsw-alias-markdown-code-block": "var(--dsw-static-neutral-bluish-900)", "--dsw-alias-markdown-code-segment-selected": "var(--dsw-static-neutral-bluish-50)", "--dsw-alias-markdown-code-segment-unselected": "var(--dsw-static-neutral-bluish-700)", "--dsw-alias-markdown-inline-code": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-markdown-placeholder": "var(--dsw-static-neutral-bluish-700)", "--dsw-alias-markdown-tag": "var(--dsw-static-neutral-bluish-700)", "--dsw-alias-scrollbar-bg-l1": "var(--dsw-static-neutral-400)", "--dsw-alias-scrollbar-bg-l2": "var(--dsw-static-neutral-500)", "--dsw-alias-scrollbar-hover-l1": "var(--dsw-static-neutral-500)", "--dsw-alias-scrollbar-hover-l2": "var(--dsw-static-neutral-600)", "--dsw-alias-state-business-primary": "var(--dsw-static-deepseek-400)", "--dsw-alias-state-business-tertiary": "var(--dsw-static-deepseek-100)", "--dsw-alias-state-error-primary": "var(--dsw-static-red-400)", "--dsw-alias-state-error-secondary": "var(--dsw-static-red-400)", "--dsw-alias-state-success-primary": "var(--dsw-static-green-400)", "--dsw-alias-state-success-secondary": "var(--dsw-static-green-400)", "--dsw-alias-state-success-tertiary": "var(--dsw-static-green-100)", "--dsw-alias-state-warn-label": "var(--dsw-static-amber-400)", "--dsw-alias-state-warn-primary": "var(--dsw-static-amber-400)", "--dsw-alias-state-warn-secondary": "var(--dsw-static-amber-400)", "--dsw-alias-state-warn-tertiary": "var(--dsw-static-amber-100)", "--dsw-alias-toast-bg": "var(--dsw-static-neutral-bluish-800)", "--dsw-alias-tooltip-bg": "var(--dsw-static-neutral-bluish-850)", "--dsw-specific-bubble-highlight": "var(--dsw-static-deepseek-700)", "--dsw-specific-bubble": "var(--dsw-static-deepseek-800)", "--dsw-specific-input-major": "var(--dsw-static-neutral-bluish-900)", "--dsw-specific-login-input": "var(--dsw-static-neutral-bluish-850)", "--dsw-specific-menu": "var(--dsw-alias-bg-layer-3)", "--dsw-specific-selector": "var(--dsw-static-neutral-bluish-850)", "--dsw-specific-sidebar-fill": "var(--dsw-static-neutral-bluish-900)", "--dsw-specific-sidebar-nav-item-active-accent": "var(--dsw-static-deepseek-700)", "--dsw-specific-sidebar-nav-item-active": "var(--dsw-static-neutral-bluish-800)", "--dsw-specific-sidebar-nav-item-hover": "var(--dsw-static-neutral-bluish-850)", "--dsw-specific-tip": "var(--dsw-static-neutral-bluish-700)"
+    }
+
 
     /* ── 持久化桥：Host 半的 settings 路由（dshp-inx-custom-ui 命名空间）── */
     function createBridge() {
@@ -411,7 +418,7 @@ window.__ModuleLoader__.load({
     }
 
     /* ── 画廊组件：theme/change 驱动实时高亮 ── */
-    function createGallery(ctx, theme, bridge) {
+    function createGallery(ctx, theme, bridge, applyChoice) {
       return function ThemeGallery() {
         const [revision, setRevision] = React.useState(-1)
         const [notice, setNotice] = React.useState(null)
@@ -422,37 +429,36 @@ window.__ModuleLoader__.load({
         }, [])
         const snap = theme.getTheme()
         const current = snap && snap.active ? snap.active.id : ''
+        const resolved = snap && snap.preference === 'system'
+          ? (current === 'dark' ? 'dark' : 'light')
+          : (snap ? snap.preference : current)
         const label = {}
         for (const t of THEMES) label[t.id] = t.label
         label.light = BUILTIN_LABELS.light
         label.dark = BUILTIN_LABELS.dark
-        const currentLabel = label[current] || current
+        /* 新架构下「当前态」显示：官方 scheme（resolved）+ 是否有自定义层（desiredId） */
+        const currentLabel = desiredId.length > 0 && label[desiredId]
+          ? label[desiredId]
+          : (resolved === 'dark' ? BUILTIN_LABELS.dark : resolved === 'light' ? BUILTIN_LABELS.light : current)
 
         const pick = function (t) {
           desiredId = t.id
-          /* 双写策略：
-           * 1) 先把内置 scheme 写进官方 ui-theme.preference（走 setTheme 正规通道）——
-           *    官方 adopt() 触发时读到的偏好与自定义主题同色系，恢复也不会亮暗跳变；
-           * 2) 再切自定义 id（内存生效）。 */
-          try {
-            if (t.colorScheme === 'light' || t.colorScheme === 'dark') {
-              if (theme.getTheme().preference !== t.colorScheme) theme.setTheme(t.colorScheme)
-            }
-            theme.setTheme(t.id)
-          } catch (e) { console.error(String(e && e.message)) }
+          /* 新架构：覆盖层 + 官方偏好双写，无守护 */
+          applyChoice(t.id)
           bridge.saveTheme(t.id).then(function (reply) {
-            setNotice(reply && reply.ok ? null : { err: (reply && reply.error) || '主题选择保存失败（重启后会回到内置偏好）' })
+            setNotice(reply && reply.ok ? null : { err: (reply && reply.error) || '主题选择保存失败（重启后会回到官方默认）' })
           }).catch(function (e) {
             setNotice({ err: '主题选择保存失败：' + String((e && e.message) || e) })
           })
         }
 
-        /* 回到内置偏好：清持久化 + 跟随官方外观行（解除守护）。 */
+        /* 回到官方默认：撤销覆盖层 + 清持久化；官方亮/暗偏好保留原值。 */
         const release = function () {
           desiredId = ''
+          applyChoice('')
           bridge.saveTheme('').then(function (reply) {
             setNotice(reply && reply.ok
-              ? { err: null, ok: '已回到内置偏好，请在"外观"行选择浅色/深色/跟随系统' }
+              ? { err: null, ok: '已回到官方默认配色；亮/暗请用上方「外观」行切换' }
               : { err: (reply && reply.error) || '清除失败' })
           }).catch(function (e) {
             setNotice({ err: '清除失败：' + String((e && e.message) || e) })
@@ -460,7 +466,7 @@ window.__ModuleLoader__.load({
         }
 
         const cards = THEMES.map(function (t) {
-          const active = current === t.id
+          const active = desiredId === t.id
           const swatches = t.swatch.map(function (c) {
             return React.createElement('span', { key: c, className: 'tg-swatch', style: { background: c } })
           })
@@ -499,13 +505,6 @@ window.__ModuleLoader__.load({
       const theme = ctx.get('theme')
       if (slots === undefined || theme === undefined) return
 
-      /* 注册全部主题（disposer 交给 ctx.effect） */
-      for (const t of THEMES) {
-        ctx.effect(function () {
-          return theme.register({ id: t.id, colorScheme: t.colorScheme, tokens: t.tokens })
-        }, 'custom-ui: register ' + t.id)
-      }
-
       /* 画廊设置页 */
       const style = document.createElement('style')
       style.setAttribute('data-plugin-css', 'dshp-inx-custom-ui/gallery.css')
@@ -513,58 +512,75 @@ window.__ModuleLoader__.load({
       document.head.appendChild(style)
       ctx.effect(function () { return function () { style.remove() } }, 'custom-ui: section styles')
 
-      /* 启动恢复 + 守护：
-       * 1) 读 settings 持久化的 themeId，注册完成后 setTheme 恢复；
-       * 2) 守护监听 theme/change——官方 adopt() 在任何 settings 提交后把内存
-       *    偏好重置回 ui-theme.preference（自定义 id 不在其 schema 里），
-       *    守护在同一同步事件链里重新应用，页面无闪跳；
-       * 3) 用户"回到内置偏好"后 desiredId 为空，守护退出，官方外观行恢复权威。
-       * Host 半 404（旧版本未重启）时静默跳过——内置偏好仍然生效。 */
+      /* ── 新架构：官方亮/暗为唯一偏好，自定义主题作为 overrideTokens 覆盖层 ──
+       *
+       * 设计（遵循官方系统，不再与之对抗）：
+       *   - 不再 register 自定义主题 id——官方 ui-theme.preference 只认
+       *     light/dark/system，之前注册自定义 id 后守护与 adopt 互相抢夺偏好。
+       *   - 每套主题 = 一个 token 覆盖层 { 每 token: {light, dark} }：
+       *     · 主题自身 scheme 分支填主题值；
+       *     · 对侧分支填官方样式表原始值（var(--dsw-static-…) 引用，无操作覆盖），
+       *       用户切官方亮/暗时覆盖层自动呈现对侧（=官方原样）。
+       *   - 选主题 = overrideTokens('dshp-inx-custom-ui', pair) + setTheme(主题scheme)
+       *     ——本质就是"切官方亮/暗 + 换 CSS"，与官方外观行完全同轨，
+       *     官方 adopt() 读到的偏好永远合法，无需任何守护。
+       *   - 「回到官方默认」= 撤销覆盖层（disposer）。
+       * 官方 preference=system 时按 prefers-color-scheme 解析，覆盖层随之自动切换。 */
+      const OVERRIDE_SOURCE = 'dshp-inx-custom-ui'
+      let overrideDispose = null
+
+      function findTheme(id) {
+        for (const t of THEMES) if (t.id === id) return t
+        return null
+      }
+
+      /** 把一套主题 token（单 scheme）展开成官方覆盖层 pair。 */
+      function buildPair(t) {
+        const pair = {}
+        const officialSide = t.colorScheme === 'dark' ? OFFICIAL_LIGHT : OFFICIAL_DARK
+        for (const [name, value] of Object.entries(t.tokens)) {
+          /* 对侧 scheme 覆盖成官方原值；本侧为主题值 */
+          pair[name] = t.colorScheme === 'dark'
+            ? { light: name in officialSide ? officialSide[name] : value, dark: value }
+            : { dark: name in officialSide ? officialSide[name] : value, light: value }
+        }
+        return pair
+      }
+
+      /** 应用主题覆盖层 + 官方偏好切到主题 scheme。空 id = 撤销覆盖（回官方）。 */
+      function applyThemeChoice(themeId) {
+        try {
+          if (overrideDispose) { overrideDispose(); overrideDispose = null }
+          const t = themeId ? findTheme(themeId) : null
+          if (t) {
+            overrideDispose = theme.overrideTokens(OVERRIDE_SOURCE, buildPair(t))
+            const pref = theme.getTheme().preference
+            if (pref !== t.colorScheme) theme.setTheme(t.colorScheme)
+          }
+        } catch (e) {
+          console.error('[dshp-inx-custom-ui] 主题覆盖失败: ' + String(e && e.message))
+        }
+      }
+
+      /* 启动恢复：读 settings 持久化的 themeId，重建覆盖层（官方偏好已是
+       * 上次双写过的 scheme，或被外部改过——覆盖层都兼容，因为双分支常驻）。 */
       const bridge = createBridge()
       bridge.state().then(function (reply) {
         const saved = reply && reply.ok === true && typeof reply.themeId === 'string' ? reply.themeId : ''
-        if (saved.length > 0) {
-          desiredId = saved
-          try { theme.setTheme(saved) } catch (e) {
-            desiredId = ''
-            console.log('[dshp-inx-custom-ui] 恢复主题失败（可能插件版本不匹配）: ' + String(e && e.message))
-          }
-        }
+        desiredId = saved
+        if (saved.length > 0) applyThemeChoice(saved)
       }).catch(function (e) {
         console.log('[dshp-inx-custom-ui] 读取持久化主题失败: ' + String((e && e.message) || e))
       })
 
+      /* 插件停止时清覆盖层（ctx.effect 自动收回）。 */
       ctx.effect(function () {
-        return ctx.on('theme/change', function (snap) {
-          if (desiredId.length === 0) return
-          const activeId = snap && snap.active ? snap.active.id : ''
-          if (activeId !== desiredId) {
-            try { theme.setTheme(desiredId) } catch (e) {
-              console.error('[dshp-inx-custom-ui] 守护重应用失败: ' + String(e && e.message))
-            }
-          }
-        })
-      }, 'custom-ui: preference guard')
+        return function () {
+          if (overrideDispose) { try { overrideDispose() } catch (e) { /* 进程停止，忽略 */ } overrideDispose = null }
+        }
+      }, 'custom-ui: override teardown')
 
-      /* 启动自愈：恢复后短窗口内核对三次（原生 setTimeout，dispose 清理）。
-       * 第一次 apply 后镜像可能还有一轮 adopt 在途，单次 setTheme 可能被盖；
-       * 短周期重试兜住这一窗口，之后完全交给 theme/change 守护。 */
-      ctx.effect(function () {
-        const checks = [300, 900, 2000]
-        const timers = checks.map(function (delay) {
-          return setTimeout(function () {
-            if (desiredId.length === 0) return
-            try {
-              const snapNow = theme.getTheme()
-              const activeId = snapNow && snapNow.active ? snapNow.active.id : ''
-              if (activeId !== desiredId) theme.setTheme(desiredId)
-            } catch (e) { /* 注册不匹配等启动竞态：跳过本轮 */ }
-          }, delay)
-        })
-        return function () { for (const t of timers) clearTimeout(t) }
-      }, 'custom-ui: startup settle guard')
-
-      const Gallery = createGallery(ctx, theme, bridge)
+      const Gallery = createGallery(ctx, theme, bridge, applyThemeChoice)
 
       /* 背景面板：保存后即时重渲染壁纸层（onChange 钩子） */
       const BackgroundPanel = createBackgroundPanel(bridge, function (newCfg) {
