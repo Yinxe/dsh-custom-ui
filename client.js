@@ -1,8 +1,9 @@
 /* custom-ui client half — hand-authored __ModuleLoader__ bundle.
- * 「外观定制 = 调色盘」：参考 QQ 超级调色盘——分组主题卡片（渐变色卡）+
- * 图片取色生成专属渐变主题（上传图片 → 提取主色 → 亮/暗双套 token + body 渐变）。
+ * 「外观定制 = 调色盘」：主题网格（grid 自适应，一行默认 4 张）+
+ * 壁纸取色生成 Material You 整套配色（上传壁纸 → 提取 seed → MD3 调色板 +
+ * 亮/暗双 scheme + body 渐变，导出兼容 MD3 令牌命名）。
  * 架构：官方亮/暗为唯一偏好（overrideTokens 覆盖层），持久化走 Host settings。
- * 主题 token 数据与 lib/themes/*.js 保持同步（同一来源规范）；photo 取色算法
+ * 主题 token 数据与 lib/themes/*.js 保持同步（同一来源规范）；MD3 引擎
  * 与 lib/themes/photo.js 同源。 */
 window.__ModuleLoader__.load({
   id: '@dshp-inx/custom-ui',
@@ -12,200 +13,117 @@ window.__ModuleLoader__.load({
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
     const React = require('react')
 
-    /* ── 调色盘样式（全部走 --dsw-* 主题 token，随主题自适应）── */
+    /* ── 调色盘样式（全部走 --dsw-* 主题 token，随主题自适应；紧凑版）── */
     const CSS = `
-.tg-page{display:flex;flex-direction:column;gap:14px;color:var(--dsw-alias-label-primary)}
-.tg-head{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}
-.tg-group{display:flex;flex-direction:column;gap:10px}
-.tg-groupTitle{display:flex;flex-direction:column;gap:2px}
-.tg-groupName{color:var(--dsw-alias-label-primary);font-size:14px;font-weight:600;line-height:20px}
-.tg-groupSub{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:16px}
-.tg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:12px}
-.tg-card{display:flex;flex-direction:column;gap:8px;padding:10px;cursor:pointer;text-align:left;border-radius:12px;font:inherit;color:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);transition:border-color .15s,background .15s,transform .15s}
-.tg-card:hover{background:var(--dsw-alias-interactive-bg-hover);transform:translateY(-1px)}
-.tg-card:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
-.tg-card.tg-active{border:2px solid var(--dsw-alias-brand-primary)}
-/* 卡片内：色块（渐变条）+ 名字 + 描述，纵向 */
-.tg-swatch{display:block;width:100%;height:36px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1)}
-.tg-nameRow{display:flex;align-items:center;gap:6px;min-height:18px}
-.tg-name{font-size:12.5px;font-weight:600;line-height:17px;color:var(--dsw-alias-label-primary)}
-.tg-badge{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-brand-primary);color:#fff;white-space:nowrap;flex:none}
-.tg-desc{font-size:11px;color:var(--dsw-alias-label-tertiary);line-height:15px}
-.tg-photoSwatch{background:conic-gradient(from 180deg,#f87171,#fbbf24,#4ade80,#38bdf8,#818cf8,#f472b6,#f87171)}
-.tg-release{border:none;background:none;padding:0;font:inherit;font-size:12px;cursor:pointer;color:var(--dsw-alias-brand-primary)}
+.tg-page{max-width:800px;display:flex;flex-direction:column;gap:8px;color:var(--dsw-alias-label-primary)}
+/* 顶部简单配置区：状态 + 圆角 + 快捷操作，一张小面板收拢 */
+.tg-topbar{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:12px;background:var(--dsw-alias-bg-module-platform);border:.5px solid var(--dsw-alias-border-l2)}
+.tg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
+.tg-status b{color:var(--dsw-alias-label-primary);font-weight:600}
+.tg-release{border:none;background:none;padding:0;font:inherit;font-size:12px;cursor:pointer;color:var(--dsw-alias-state-business-primary)}
 .tg-release:hover{text-decoration:underline}
 .tg-release:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:2px}
-.tg-radiusRow{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--dsw-alias-border-l1);padding-top:12px;margin-top:4px}
-.tg-radiusLabel{font-size:12px;color:var(--dsw-alias-label-secondary)}
-.tg-radiusBtns{display:flex;gap:8px;flex-wrap:wrap}
-.tg-radiusBtn{padding:8px 12px;font-size:12px}
+.tg-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tg-ctlLabel{font-size:12px;color:var(--dsw-alias-label-tertiary);flex:none}
+.tg-ctlSep{width:1px;height:16px;background:var(--dsw-alias-border-l2);flex:none}
+.tg-head{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}
+.tg-headErr{color:var(--dsw-alias-state-error-primary)}
+.tg-headOk{color:var(--dsw-alias-state-success-primary)}
+/* 主题色列表（最后一项）：无分组，grid 密铺默认 4 列自适应 */
+.tg-list{display:flex;flex-direction:column;gap:8px;padding-top:8px}
+.tg-now{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--dsw-alias-bg-module-platform);border:.5px solid var(--dsw-alias-border-l2)}
+.tg-nowMosaic{display:flex;width:76px;height:30px;border-radius:7px;overflow:hidden;flex:none;border:.5px solid var(--dsw-alias-border-l2)}
+.tg-nowMosaic i{display:block;height:100%;min-width:0}
+.tg-nowMeta{display:flex;flex-direction:column;gap:0;min-width:0;flex:1}
+.tg-nowTitle{font-size:12px;font-weight:700;line-height:17px;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-nowSub{font-size:11px;line-height:15px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-nowDots{display:flex;gap:5px;align-items:center;flex:none}
+.tg-nowDots i{width:12px;height:12px;border-radius:50%;border:.5px solid var(--dsw-alias-border-l2);display:block}
+.tg-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tg-search{box-sizing:border-box;height:26px;width:170px;max-width:100%;padding:0 11px;border-radius:13px;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:12px;line-height:26px;outline:none}
+.tg-search::placeholder{color:var(--dsw-alias-label-quaternary)}
+.tg-search:focus{border-color:var(--dsw-alias-brand-primary)}
+.tg-count{margin-left:auto;font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}
+/* 壁纸取色独立配置区（MD3 整套配色预览 + 操作） */
+.tg-wall{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:var(--dsw-alias-bg-module-platform);border:.5px solid var(--dsw-alias-border-l2)}
+.tg-wallHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tg-wallTitle{font-size:12px;font-weight:700;line-height:18px;color:var(--dsw-alias-label-primary)}
+.tg-seedChip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:11px;background:var(--dsw-alias-bg-layer-1);font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dsw-alias-label-secondary)}
+.tg-seedChip i{width:11px;height:11px;border-radius:50%;display:block;border:.5px solid var(--dsw-alias-border-l2)}
+.tg-wallActions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tg-wallBody{display:flex;flex-direction:column;gap:6px}
+.tg-toneRow{display:flex;align-items:center;gap:6px}
+.tg-toneName{width:88px;flex:none;font-size:10px;line-height:14px;color:var(--dsw-alias-label-tertiary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-toneCells{display:flex;flex:1;gap:2px;min-width:0}
+.tg-toneCells i{flex:1;height:20px;border-radius:4px;min-width:0;display:block}
+.tg-roles{display:flex;flex-direction:column;gap:3px}
+.tg-roleRow{display:flex;align-items:flex-start;gap:6px}
+.tg-chips{display:flex;flex:1;gap:4px;flex-wrap:wrap;min-width:0}
+.tg-chip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:10px;background:var(--dsw-alias-bg-layer-1);font-size:10px;line-height:20px;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.tg-chip i{width:10px;height:10px;border-radius:3px;display:block;flex:none}
+.tg-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:stretch}
+@media (max-width:720px){.tg-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){.tg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tg-search{width:130px}}
+/* 截图式主题卡·小尺寸：顶部拼接色块 + 编号 + 标签标题描述 + 底部胶囊按钮 + Live 态（grid 子项） */
+.tg-card{box-sizing:border-box;display:flex;flex-direction:column;padding:0;overflow:hidden;cursor:pointer;text-align:left;border-radius:12px;font:inherit;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-module-platform);border:.5px solid var(--dsw-alias-border-l2);min-width:0;width:100%;transition:border-color .15s,box-shadow .15s,transform .15s}
+.tg-card:hover:not(.tg-active){border-color:var(--dsw-alias-border-l4)}
+.tg-card:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
+.tg-card.tg-active{background:var(--dsw-alias-bg-module-platform)}
+.tg-mosaic{position:relative;display:flex;height:44px;flex:none}
+.tg-mosaic i{display:block;height:100%;min-width:0}
+.tg-mA{flex:5}
+.tg-mB{flex:3}
+.tg-mC{flex:2}
+.tg-idx{position:absolute;top:4px;right:6px;font-size:9px;line-height:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:rgba(255,255,255,.88);text-shadow:0 1px 3px rgba(0,0,0,.45);letter-spacing:.04em}
+.tg-body{display:flex;flex-direction:column;gap:1px;padding:7px 9px 8px;min-width:0}
+.tg-tag{font-size:10px;font-weight:600;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-title{font-size:13px;font-weight:700;line-height:18px;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-desc{font-size:10px;line-height:14px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-foot{display:flex;align-items:center;gap:6px;margin-top:6px}
+.tg-use{display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 10px;border:none;border-radius:11px;font-size:11px;font-weight:600;line-height:22px;color:#fff;cursor:pointer;flex:none}
+.tg-use:hover{filter:brightness(1.08)}
+.tg-live{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:500;line-height:14px;white-space:nowrap}
+.tg-live i{width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;flex:none}
+.tg-check{margin-left:auto;font-size:11px;font-weight:700;flex:none}
+.tg-photoSwatch{background:conic-gradient(from 180deg,#f87171,#fbbf24,#4ade80,#38bdf8,#818cf8,#f472b6,#f87171)}
+/* 紧凑胶囊按钮（圆角档 + 上传取色共用小尺寸） */
+.tg-radiusBtns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tg-radiusBtn{box-sizing:border-box;background:var(--dsw-alias-bg-layer-1);height:24px;font:inherit;color:var(--dsw-alias-label-primary);cursor:pointer;border:none;border-radius:12px;align-items:center;gap:6px;padding:0 10px;font-size:11px;line-height:24px;display:inline-flex}
+.tg-radiusBtn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
+.tg-radiusBtn.tg-active{background:var(--dsw-alias-bg-multi-select);box-shadow:inset 0 0 0 1px var(--dsw-alias-button-ghost-active-border)}
+@media (prefers-reduced-motion:reduce){.tg-card{transition:none}}
 `
 
-    /* ── 字体栈常量（与 lib/themes/shared.js 同源）── */
-    const MONO = '"Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace'
-    const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'
-    const INTER = '"Inter Variable", "Inter", "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif'
-    const NOTION = '"NotionInter", "Inter", -apple-system, system-ui, Helvetica, Arial, sans-serif'
-    const CLAUDE_SANS = '"Anthropic Sans", "Arial", system-ui, -apple-system, sans-serif'
+    /* ── 主题目录（meta-only；token 由 Host 经 GET /themes 下发，单源 lib/themes）──
+     * swatch：卡片三色拼接 + 搜索 accent（= lib meta.swatch，不含 token）；
+     * group：分组归属（品牌主题不设，与 cisco/replicate 一致）。 */
 
-    const TEXT_STYLE_KEYS = ['base-16', 'base-strong-16', 'l-20', 'm-18', 's-14', 's-strong-14', 'xl-24', 'xs-13', 'xs-strong-13', 'xxs-12', 'xxs-strong-12', 'xxxs-11', 'xxxs-strong-11']
-    const MD_STYLE_KEYS = ['base', 'base-italic', 'base-strong', 'base-strong-italic', 'small', 'small-italic', 'small-strong', 'small-strong-italic', 'code', 'code-block', 'code-block-small', 'h1', 'h2', 'h3', 'h4', 'table', 'table-head']
-
-    function fillFontTokens(tokens, font, mono) {
-      const ui = mono ? MONO : font
-      for (const s of TEXT_STYLE_KEYS) tokens['--dsw-font-' + s + '-font-family'] = ui
-      for (const m of MD_STYLE_KEYS) {
-        const isCode = m === 'code' || m === 'code-block' || m === 'code-block-small'
-        tokens['--dsw-font-markdown-' + m + '-font-family'] = isCode ? MONO : ui
-      }
-      return tokens
-    }
-
-    const FLAT = { '--dsw-shadow-lv1': 'none', '--dsw-shadow-lv2': 'none', '--dsw-shadow-lv3': 'none', '--dsw-shadow-lv1-blur': '0px' }
-
-    /* ── 各主题 token 集（与 lib/themes/*.js 同源规范；深浅分离）── */
-
-    const opencodeDark = fillFontTokens({
-      '--dsw-alias-bg-base': '#201d1d', '--dsw-alias-bg-layer-1': '#302c2c', '--dsw-alias-bg-layer-2': '#3a3535', '--dsw-alias-bg-layer-3': '#423d3d', '--dsw-alias-bg-overlay': '#302c2c', '--dsw-alias-bg-multi-select': '#302c2c', '--dsw-alias-bg-module-platform': '#302c2c', '--dsw-alias-bg-skeleton': '#302c2c',
-      '--dsw-alias-border-l1': '#464343', '--dsw-alias-border-l2': '#646262', '--dsw-alias-border-l2-darkmode-thin': '#464343', '--dsw-alias-border-l3': '#6e6e73', '--dsw-alias-border-l4': '#9a9898', '--dsw-alias-border-inverted': '#fdfcfc', '--dsw-alias-border-inverted2': '#c8c6c4', '--dsw-alias-separator-primary': '#464343', '--dsw-alias-line-secondary': '#302c2c', '--dsw-alias-fill-l2': '#3a3535', '--dsw-alias-fill-tsp-secondary': 'rgba(253, 252, 252, 0.06)',
-      '--dsw-alias-brand-primary': '#007aff', '--dsw-alias-brand-primary-invert': '#ffffff', '--dsw-alias-brand-text': '#007aff',
-      '--dsw-alias-button-primary-fill': '#007aff', '--dsw-alias-button-primary-hover': '#0056b3', '--dsw-alias-button-primary-dimmed': '#0056b3', '--dsw-alias-button-contrast-fill': '#fdfcfc', '--dsw-alias-button-elevated-fill': '#302c2c', '--dsw-alias-button-floating-fill': '#302c2c', '--dsw-alias-button-floating-hover': '#3a3535', '--dsw-alias-button-ghost-active-border': '#646262', '--dsw-alias-button-ghost-active-fill': '#3a3535', '--dsw-alias-button-ghost-active-hover': '#423d3d', '--dsw-alias-button-info-fill': '#007aff', '--dsw-alias-button-info-hover': '#0056b3', '--dsw-alias-button-tool-bar-fill': '#302c2c', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#3a3535',
-      '--dsw-alias-interactive-bg-hover': '#2a2626', '--dsw-alias-interactive-bg-active': '#3a3535', '--dsw-alias-interactive-bg-hover-accent': 'rgba(0, 122, 255, 0.12)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(255, 59, 48, 0.12)', '--dsw-alias-interactive-bg-hover-solid': '#3a3535',
-      '--dsw-alias-label-primary': '#fdfcfc', '--dsw-alias-label-secondary': '#c8c6c4', '--dsw-alias-label-tertiary': '#9a9898', '--dsw-alias-label-quaternary': '#6e6e73', '--dsw-alias-label-caption': '#9a9898', '--dsw-alias-label-dimmed': '#6e6e73', '--dsw-alias-label-error': '#ff3b30', '--dsw-alias-label-primary-foreground': '#fdfcfc', '--dsw-alias-label-primary-inverted': '#201d1d', '--dsw-alias-label-primary-bluish': '#007aff',
-      '--dsw-alias-state-error-primary': '#ff3b30', '--dsw-alias-state-error-secondary': 'rgba(255, 59, 48, 0.12)', '--dsw-alias-state-success-primary': '#30d158', '--dsw-alias-state-success-secondary': 'rgba(48, 209, 88, 0.12)', '--dsw-alias-state-warn-primary': '#ff9f0a', '--dsw-alias-state-warn-secondary': 'rgba(255, 159, 10, 0.12)', '--dsw-alias-state-warn-label': '#ff9f0a',
-      '--dsw-alias-markdown-citation': '#007aff', '--dsw-alias-markdown-code-block': '#302c2c', '--dsw-alias-markdown-code-block-banner': '#3a3535', '--dsw-alias-markdown-inline-code': 'rgba(48, 209, 88, 0.08)', '--dsw-alias-markdown-code-segment-selected': 'rgba(0, 122, 255, 0.15)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#6e6e73', '--dsw-alias-markdown-tag': '#9a9898',
-      '--dsw-alias-scrollbar-bg-l1': '#464343', '--dsw-alias-scrollbar-bg-l2': '#3a3535', '--dsw-alias-scrollbar-hover-l1': '#646262', '--dsw-alias-scrollbar-hover-l2': '#423d3d',
-      '--dsw-alias-toast-bg': '#302c2c', '--dsw-alias-tooltip-bg': '#302c2c', '--dsw-hovercard-bg': '#302c2c',
-      '--dsw-specific-sidebar-fill': '#201d1d', '--dsw-specific-sidebar-nav-item-active': '#3a3535', '--dsw-specific-sidebar-nav-item-active-accent': '#007aff', '--dsw-specific-sidebar-nav-item-hover': '#2a2626', '--dsw-specific-bubble': '#302c2c', '--dsw-specific-bubble-highlight': '#3a3535', '--dsw-specific-input-major': '#302c2c', '--dsw-specific-login-input': '#302c2c', '--dsw-specific-menu': '#302c2c', '--dsw-specific-selector': '#302c2c', '--dsw-specific-tip': '#302c2c',
-      '--dsw-font-family': MONO, '--dsw-font-mono': MONO, ...FLAT
-    }, MONO, true)
-
-    const opencodeLight = fillFontTokens({
-      '--dsw-alias-bg-base': '#fdfcfc', '--dsw-alias-bg-layer-1': '#f1eeee', '--dsw-alias-bg-layer-2': '#e9e2e2', '--dsw-alias-bg-layer-3': '#e2dcdc', '--dsw-alias-bg-overlay': '#ffffff', '--dsw-alias-bg-multi-select': '#f1eeee', '--dsw-alias-bg-module-platform': '#f1eeee', '--dsw-alias-bg-skeleton': '#f1eeee',
-      '--dsw-alias-border-l1': '#e2dcdc', '--dsw-alias-border-l2': '#9a9898', '--dsw-alias-border-l2-darkmode-thin': '#e2dcdc', '--dsw-alias-border-l3': '#b5aeae', '--dsw-alias-border-l4': '#9a9898', '--dsw-alias-border-inverted': '#201d1d', '--dsw-alias-border-inverted2': '#424245', '--dsw-alias-separator-primary': '#d6cfcf', '--dsw-alias-line-secondary': '#e9e2e2', '--dsw-alias-fill-l2': '#e9e2e2', '--dsw-alias-fill-tsp-secondary': 'rgba(32, 29, 29, 0.05)',
-      '--dsw-alias-brand-primary': '#007aff', '--dsw-alias-brand-primary-invert': '#ffffff', '--dsw-alias-brand-text': '#007aff',
-      '--dsw-alias-button-primary-fill': '#201d1d', '--dsw-alias-button-primary-hover': '#3d3a3a', '--dsw-alias-button-primary-dimmed': '#424245', '--dsw-alias-button-contrast-fill': '#201d1d', '--dsw-alias-button-elevated-fill': '#ffffff', '--dsw-alias-button-floating-fill': '#ffffff', '--dsw-alias-button-floating-hover': '#f1eeee', '--dsw-alias-button-ghost-active-border': '#9a9898', '--dsw-alias-button-ghost-active-fill': '#e9e2e2', '--dsw-alias-button-ghost-active-hover': '#d6cfcf', '--dsw-alias-button-info-fill': '#007aff', '--dsw-alias-button-info-hover': '#0056b3', '--dsw-alias-button-tool-bar-fill': '#f1eeee', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#e9e2e2',
-      '--dsw-alias-interactive-bg-hover': '#f1eeee', '--dsw-alias-interactive-bg-active': '#e9e2e2', '--dsw-alias-interactive-bg-hover-accent': 'rgba(0, 122, 255, 0.10)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(255, 59, 48, 0.10)', '--dsw-alias-interactive-bg-hover-solid': '#e2dcdc',
-      '--dsw-alias-label-primary': '#201d1d', '--dsw-alias-label-secondary': '#424245', '--dsw-alias-label-tertiary': '#6e6e73', '--dsw-alias-label-quaternary': '#9a9898', '--dsw-alias-label-caption': '#6e6e73', '--dsw-alias-label-dimmed': '#9a9898', '--dsw-alias-label-error': '#d70015', '--dsw-alias-label-primary-foreground': '#fdfcfc', '--dsw-alias-label-primary-inverted': '#fdfcfc', '--dsw-alias-label-primary-bluish': '#007aff',
-      '--dsw-alias-state-error-primary': '#d70015', '--dsw-alias-state-error-secondary': 'rgba(255, 59, 48, 0.10)', '--dsw-alias-state-success-primary': '#178a33', '--dsw-alias-state-success-secondary': 'rgba(48, 209, 88, 0.10)', '--dsw-alias-state-warn-primary': '#b26a00', '--dsw-alias-state-warn-secondary': 'rgba(255, 159, 10, 0.10)', '--dsw-alias-state-warn-label': '#b26a00',
-      '--dsw-alias-markdown-citation': '#007aff', '--dsw-alias-markdown-code-block': '#f6f3f3', '--dsw-alias-markdown-code-block-banner': '#eae4e4', '--dsw-alias-markdown-inline-code': 'rgba(48, 209, 88, 0.10)', '--dsw-alias-markdown-code-segment-selected': 'rgba(0, 122, 255, 0.12)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#9a9898', '--dsw-alias-markdown-tag': '#6e6e73',
-      '--dsw-alias-scrollbar-bg-l1': '#d6cfcf', '--dsw-alias-scrollbar-bg-l2': '#e2dcdc', '--dsw-alias-scrollbar-hover-l1': '#9a9898', '--dsw-alias-scrollbar-hover-l2': '#d6cfcf',
-      '--dsw-alias-toast-bg': '#ffffff', '--dsw-alias-tooltip-bg': '#ffffff', '--dsw-hovercard-bg': '#ffffff',
-      '--dsw-specific-sidebar-fill': '#f1eeee', '--dsw-specific-sidebar-nav-item-active': '#e2dcdc', '--dsw-specific-sidebar-nav-item-active-accent': '#007aff', '--dsw-specific-sidebar-nav-item-hover': '#e9e2e2', '--dsw-specific-bubble': '#f1eeee', '--dsw-specific-bubble-highlight': '#e9e2e2', '--dsw-specific-input-major': '#f8f7f7', '--dsw-specific-login-input': '#f8f7f7', '--dsw-specific-menu': '#ffffff', '--dsw-specific-selector': '#ffffff', '--dsw-specific-tip': '#f1eeee',
-      '--dsw-font-family': MONO, '--dsw-font-mono': MONO, ...FLAT
-    }, MONO, true)
-
-    const linearDark = fillFontTokens({
-      '--dsw-alias-bg-base': '#08090a', '--dsw-alias-bg-layer-1': '#191a1b', '--dsw-alias-bg-layer-2': '#1f2022', '--dsw-alias-bg-layer-3': '#252629', '--dsw-alias-bg-overlay': '#191a1b', '--dsw-alias-bg-multi-select': '#191a1b', '--dsw-alias-bg-module-platform': '#191a1b', '--dsw-alias-bg-skeleton': '#191a1b',
-      '--dsw-alias-border-l1': 'rgba(255, 255, 255, 0.08)', '--dsw-alias-border-l2': 'rgba(255, 255, 255, 0.14)', '--dsw-alias-border-l2-darkmode-thin': 'rgba(255, 255, 255, 0.08)', '--dsw-alias-border-l3': 'rgba(255, 255, 255, 0.22)', '--dsw-alias-border-l4': 'rgba(255, 255, 255, 0.35)', '--dsw-alias-border-inverted': '#f7f8f8', '--dsw-alias-border-inverted2': '#d0d6e0', '--dsw-alias-separator-primary': 'rgba(255, 255, 255, 0.08)', '--dsw-alias-line-secondary': 'rgba(255, 255, 255, 0.05)', '--dsw-alias-fill-l2': '#1f2022', '--dsw-alias-fill-tsp-secondary': 'rgba(247, 248, 248, 0.05)',
-      '--dsw-alias-brand-primary': '#5e6ad2', '--dsw-alias-brand-primary-invert': '#ffffff', '--dsw-alias-brand-text': '#828fff',
-      '--dsw-alias-button-primary-fill': '#5e6ad2', '--dsw-alias-button-primary-hover': '#828fff', '--dsw-alias-button-primary-dimmed': '#4752c4', '--dsw-alias-button-contrast-fill': '#f7f8f8', '--dsw-alias-button-elevated-fill': '#191a1b', '--dsw-alias-button-floating-fill': '#191a1b', '--dsw-alias-button-floating-hover': '#1f2022', '--dsw-alias-button-ghost-active-border': 'rgba(255, 255, 255, 0.14)', '--dsw-alias-button-ghost-active-fill': '#1f2022', '--dsw-alias-button-ghost-active-hover': '#252629', '--dsw-alias-button-info-fill': '#5e6ad2', '--dsw-alias-button-info-hover': '#828fff', '--dsw-alias-button-tool-bar-fill': '#191a1b', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#1f2022',
-      '--dsw-alias-interactive-bg-hover': 'rgba(255, 255, 255, 0.06)', '--dsw-alias-interactive-bg-active': 'rgba(255, 255, 255, 0.10)', '--dsw-alias-interactive-bg-hover-accent': 'rgba(94, 106, 210, 0.25)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(220, 38, 38, 0.20)', '--dsw-alias-interactive-bg-hover-solid': '#1f2022',
-      '--dsw-alias-label-primary': '#f7f8f8', '--dsw-alias-label-secondary': '#d0d6e0', '--dsw-alias-label-tertiary': '#8f959f', '--dsw-alias-label-quaternary': '#6a707a', '--dsw-alias-label-caption': '#8f959f', '--dsw-alias-label-dimmed': '#6a707a', '--dsw-alias-label-error': '#dc2626', '--dsw-alias-label-primary-foreground': '#f7f8f8', '--dsw-alias-label-primary-inverted': '#08090a', '--dsw-alias-label-primary-bluish': '#828fff',
-      '--dsw-alias-state-error-primary': '#dc2626', '--dsw-alias-state-error-secondary': 'rgba(220, 38, 38, 0.15)', '--dsw-alias-state-success-primary': '#27a644', '--dsw-alias-state-success-secondary': 'rgba(39, 166, 68, 0.15)', '--dsw-alias-state-warn-primary': '#eab308', '--dsw-alias-state-warn-secondary': 'rgba(234, 179, 8, 0.15)', '--dsw-alias-state-warn-label': '#eab308',
-      '--dsw-alias-markdown-citation': '#828fff', '--dsw-alias-markdown-code-block': '#191a1b', '--dsw-alias-markdown-code-block-banner': '#1f2022', '--dsw-alias-markdown-inline-code': 'rgba(130, 143, 255, 0.12)', '--dsw-alias-markdown-code-segment-selected': 'rgba(94, 106, 210, 0.25)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#6a707a', '--dsw-alias-markdown-tag': '#8f959f',
-      '--dsw-alias-scrollbar-bg-l1': 'rgba(255, 255, 255, 0.10)', '--dsw-alias-scrollbar-bg-l2': 'rgba(255, 255, 255, 0.06)', '--dsw-alias-scrollbar-hover-l1': 'rgba(255, 255, 255, 0.20)', '--dsw-alias-scrollbar-hover-l2': 'rgba(255, 255, 255, 0.12)',
-      '--dsw-alias-toast-bg': '#191a1b', '--dsw-alias-tooltip-bg': '#252629', '--dsw-hovercard-bg': '#1f2022',
-      '--dsw-specific-sidebar-fill': '#08090a', '--dsw-specific-sidebar-nav-item-active': 'rgba(255, 255, 255, 0.10)', '--dsw-specific-sidebar-nav-item-active-accent': '#5e6ad2', '--dsw-specific-sidebar-nav-item-hover': 'rgba(255, 255, 255, 0.06)', '--dsw-specific-bubble': '#191a1b', '--dsw-specific-bubble-highlight': '#1f2022', '--dsw-specific-input-major': '#191a1b', '--dsw-specific-login-input': '#191a1b', '--dsw-specific-menu': '#1f2022', '--dsw-specific-selector': '#1f2022', '--dsw-specific-tip': '#252629',
-      '--dsw-font-family': INTER, '--dsw-font-mono': MONO, ...FLAT
-    }, INTER)
-
-    const notionLight = fillFontTokens({
-      '--dsw-alias-bg-base': '#ffffff', '--dsw-alias-bg-layer-1': '#f6f5f4', '--dsw-alias-bg-layer-2': '#efefee', '--dsw-alias-bg-layer-3': '#e8e7e5', '--dsw-alias-bg-overlay': '#ffffff', '--dsw-alias-bg-multi-select': '#f6f5f4', '--dsw-alias-bg-module-platform': '#f6f5f4', '--dsw-alias-bg-skeleton': '#f6f5f4',
-      '--dsw-alias-border-l1': 'rgba(0, 0, 0, 0.1)', '--dsw-alias-border-l2': 'rgba(0, 0, 0, 0.16)', '--dsw-alias-border-l2-darkmode-thin': 'rgba(0, 0, 0, 0.1)', '--dsw-alias-border-l3': 'rgba(0, 0, 0, 0.24)', '--dsw-alias-border-l4': 'rgba(0, 0, 0, 0.32)', '--dsw-alias-border-inverted': '#31302e', '--dsw-alias-border-inverted2': '#615d59', '--dsw-alias-separator-primary': 'rgba(0, 0, 0, 0.06)', '--dsw-alias-line-secondary': 'rgba(0, 0, 0, 0.1)', '--dsw-alias-fill-l2': '#efefee', '--dsw-alias-fill-tsp-secondary': 'rgba(0, 0, 0, 0.04)',
-      '--dsw-alias-brand-primary': '#0075de', '--dsw-alias-brand-primary-invert': '#ffffff', '--dsw-alias-brand-text': '#0075de',
-      '--dsw-alias-button-primary-fill': '#0075de', '--dsw-alias-button-primary-hover': '#005bab', '--dsw-alias-button-primary-dimmed': '#005bab', '--dsw-alias-button-contrast-fill': '#31302e', '--dsw-alias-button-elevated-fill': '#ffffff', '--dsw-alias-button-floating-fill': '#ffffff', '--dsw-alias-button-floating-hover': '#f6f5f4', '--dsw-alias-button-ghost-active-border': 'rgba(0, 0, 0, 0.16)', '--dsw-alias-button-ghost-active-fill': '#efefee', '--dsw-alias-button-ghost-active-hover': '#e8e7e5', '--dsw-alias-button-info-fill': '#0075de', '--dsw-alias-button-info-hover': '#005bab', '--dsw-alias-button-tool-bar-fill': '#f6f5f4', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#efefee',
-      '--dsw-alias-interactive-bg-hover': '#f6f5f4', '--dsw-alias-interactive-bg-active': '#efefee', '--dsw-alias-interactive-bg-hover-accent': 'rgba(0, 117, 222, 0.10)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(220, 38, 38, 0.08)', '--dsw-alias-interactive-bg-hover-solid': '#efefee',
-      '--dsw-alias-label-primary': 'rgba(0, 0, 0, 0.95)', '--dsw-alias-label-secondary': '#31302e', '--dsw-alias-label-tertiary': '#615d59', '--dsw-alias-label-quaternary': '#a39e98', '--dsw-alias-label-caption': '#615d59', '--dsw-alias-label-dimmed': '#a39e98', '--dsw-alias-label-error': '#dc2626', '--dsw-alias-label-primary-foreground': '#ffffff', '--dsw-alias-label-primary-inverted': '#ffffff', '--dsw-alias-label-primary-bluish': '#0075de',
-      '--dsw-alias-state-error-primary': '#dc2626', '--dsw-alias-state-error-secondary': 'rgba(220, 38, 38, 0.08)', '--dsw-alias-state-success-primary': '#1aae39', '--dsw-alias-state-success-secondary': 'rgba(26, 174, 57, 0.10)', '--dsw-alias-state-warn-primary': '#dd5b00', '--dsw-alias-state-warn-secondary': 'rgba(221, 91, 0, 0.10)', '--dsw-alias-state-warn-label': '#dd5b00',
-      '--dsw-alias-markdown-citation': '#0075de', '--dsw-alias-markdown-code-block': '#f6f5f4', '--dsw-alias-markdown-code-block-banner': '#efefee', '--dsw-alias-markdown-inline-code': 'rgba(0, 0, 0, 0.06)', '--dsw-alias-markdown-code-segment-selected': 'rgba(0, 117, 222, 0.12)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#a39e98', '--dsw-alias-markdown-tag': '#615d59',
-      '--dsw-alias-scrollbar-bg-l1': 'rgba(0, 0, 0, 0.14)', '--dsw-alias-scrollbar-bg-l2': 'rgba(0, 0, 0, 0.08)', '--dsw-alias-scrollbar-hover-l1': 'rgba(0, 0, 0, 0.26)', '--dsw-alias-scrollbar-hover-l2': 'rgba(0, 0, 0, 0.16)',
-      '--dsw-alias-toast-bg': '#ffffff', '--dsw-alias-tooltip-bg': '#31302e', '--dsw-hovercard-bg': '#ffffff',
-      '--dsw-specific-sidebar-fill': '#f6f5f4', '--dsw-specific-sidebar-nav-item-active': '#efefee', '--dsw-specific-sidebar-nav-item-active-accent': '#0075de', '--dsw-specific-sidebar-nav-item-hover': '#efefee', '--dsw-specific-bubble': '#f6f5f4', '--dsw-specific-bubble-highlight': '#efefee', '--dsw-specific-input-major': '#f6f5f4', '--dsw-specific-login-input': '#f6f5f4', '--dsw-specific-menu': '#ffffff', '--dsw-specific-selector': '#ffffff', '--dsw-specific-tip': '#31302e',
-      '--dsw-shadow-lv1': '0 1px 2px rgba(0, 0, 0, 0.04)', '--dsw-shadow-lv2': '0 2px 6px rgba(0, 0, 0, 0.04)', '--dsw-shadow-lv3': '0 4px 12px rgba(0, 0, 0, 0.05)', '--dsw-shadow-lv1-blur': '2px',
-      '--dsw-font-family': NOTION, '--dsw-font-mono': MONO
-    }, NOTION)
-
-    const claudeLight = fillFontTokens({
-      '--dsw-alias-bg-base': '#f5f4ed', '--dsw-alias-bg-layer-1': '#faf9f5', '--dsw-alias-bg-layer-2': '#f0eee6', '--dsw-alias-bg-layer-3': '#e8e6dc', '--dsw-alias-bg-overlay': '#faf9f5', '--dsw-alias-bg-multi-select': '#faf9f5', '--dsw-alias-bg-module-platform': '#faf9f5', '--dsw-alias-bg-skeleton': '#f0eee6',
-      '--dsw-alias-border-l1': '#f0eee6', '--dsw-alias-border-l2': '#e8e6dc', '--dsw-alias-border-l2-darkmode-thin': '#f0eee6', '--dsw-alias-border-l3': '#dcd9ce', '--dsw-alias-border-l4': '#c9c5b8', '--dsw-alias-border-inverted': '#141413', '--dsw-alias-border-inverted2': '#3d3d3a', '--dsw-alias-separator-primary': '#f0eee6', '--dsw-alias-line-secondary': '#e8e6dc', '--dsw-alias-fill-l2': '#f0eee6', '--dsw-alias-fill-tsp-secondary': 'rgba(20, 20, 19, 0.04)',
-      '--dsw-alias-brand-primary': '#c96442', '--dsw-alias-brand-primary-invert': '#faf9f5', '--dsw-alias-brand-text': '#c96442',
-      '--dsw-alias-button-primary-fill': '#c96442', '--dsw-alias-button-primary-hover': '#b5573a', '--dsw-alias-button-primary-dimmed': '#b5573a', '--dsw-alias-button-contrast-fill': '#141413', '--dsw-alias-button-elevated-fill': '#faf9f5', '--dsw-alias-button-floating-fill': '#faf9f5', '--dsw-alias-button-floating-hover': '#f0eee6', '--dsw-alias-button-ghost-active-border': '#dcd9ce', '--dsw-alias-button-ghost-active-fill': '#e8e6dc', '--dsw-alias-button-ghost-active-hover': '#dcd9ce', '--dsw-alias-button-info-fill': '#c96442', '--dsw-alias-button-info-hover': '#b5573a', '--dsw-alias-button-tool-bar-fill': '#faf9f5', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#f0eee6',
-      '--dsw-alias-interactive-bg-hover': '#f0eee6', '--dsw-alias-interactive-bg-active': '#e8e6dc', '--dsw-alias-interactive-bg-hover-accent': 'rgba(201, 100, 66, 0.10)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(181, 51, 51, 0.08)', '--dsw-alias-interactive-bg-hover-solid': '#e8e6dc',
-      '--dsw-alias-label-primary': '#141413', '--dsw-alias-label-secondary': '#3d3d3a', '--dsw-alias-label-tertiary': '#5e5d59', '--dsw-alias-label-quaternary': '#87867f', '--dsw-alias-label-caption': '#5e5d59', '--dsw-alias-label-dimmed': '#87867f', '--dsw-alias-label-error': '#b53333', '--dsw-alias-label-primary-foreground': '#faf9f5', '--dsw-alias-label-primary-inverted': '#faf9f5', '--dsw-alias-label-primary-bluish': '#c96442',
-      '--dsw-alias-state-error-primary': '#b53333', '--dsw-alias-state-error-secondary': 'rgba(181, 51, 51, 0.08)', '--dsw-alias-state-success-primary': '#17a34a', '--dsw-alias-state-success-secondary': 'rgba(23, 163, 74, 0.10)', '--dsw-alias-state-warn-primary': '#eab308', '--dsw-alias-state-warn-secondary': 'rgba(234, 179, 8, 0.10)', '--dsw-alias-state-warn-label': '#b8860b',
-      '--dsw-alias-markdown-citation': '#c96442', '--dsw-alias-markdown-code-block': '#f0eee6', '--dsw-alias-markdown-code-block-banner': '#e8e6dc', '--dsw-alias-markdown-inline-code': 'rgba(201, 100, 66, 0.08)', '--dsw-alias-markdown-code-segment-selected': 'rgba(201, 100, 66, 0.12)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#87867f', '--dsw-alias-markdown-tag': '#5e5d59',
-      '--dsw-alias-scrollbar-bg-l1': '#dcd9ce', '--dsw-alias-scrollbar-bg-l2': '#e8e6dc', '--dsw-alias-scrollbar-hover-l1': '#c9c5b8', '--dsw-alias-scrollbar-hover-l2': '#dcd9ce',
-      '--dsw-alias-toast-bg': '#faf9f5', '--dsw-alias-tooltip-bg': '#31302e', '--dsw-hovercard-bg': '#faf9f5',
-      '--dsw-specific-sidebar-fill': '#f0eee6', '--dsw-specific-sidebar-nav-item-active': '#e8e6dc', '--dsw-specific-sidebar-nav-item-active-accent': '#c96442', '--dsw-specific-sidebar-nav-item-hover': '#f0eee6', '--dsw-specific-bubble': '#faf9f5', '--dsw-specific-bubble-highlight': '#f0eee6', '--dsw-specific-input-major': '#faf9f5', '--dsw-specific-login-input': '#faf9f5', '--dsw-specific-menu': '#faf9f5', '--dsw-specific-selector': '#faf9f5', '--dsw-specific-tip': '#31302e',
-      '--dsw-shadow-lv1': '0 0 0 1px #e8e6dc', '--dsw-shadow-lv2': '0 0 0 1px #dcd9ce', '--dsw-shadow-lv3': '0 0 0 1px #c9c5b8', '--dsw-shadow-lv1-blur': '0px',
-      '--dsw-font-family': CLAUDE_SANS, '--dsw-font-mono': MONO
-    }, CLAUDE_SANS)
-
-    const nvidiaDark = fillFontTokens({
-      '--dsw-alias-bg-base': '#000000', '--dsw-alias-bg-layer-1': '#1a1a1a', '--dsw-alias-bg-layer-2': '#222222', '--dsw-alias-bg-layer-3': '#2a2a2a', '--dsw-alias-bg-overlay': '#1a1a1a', '--dsw-alias-bg-multi-select': '#1a1a1a', '--dsw-alias-bg-module-platform': '#1a1a1a', '--dsw-alias-bg-skeleton': '#1a1a1a',
-      '--dsw-alias-border-l1': '#2a2a2a', '--dsw-alias-border-l2': '#5e5e5e', '--dsw-alias-border-l2-darkmode-thin': '#2a2a2a', '--dsw-alias-border-l3': '#7a7a7a', '--dsw-alias-border-l4': '#9a9a9a', '--dsw-alias-border-inverted': '#ffffff', '--dsw-alias-border-inverted2': '#a7a7a7', '--dsw-alias-separator-primary': '#2a2a2a', '--dsw-alias-line-secondary': '#222222', '--dsw-alias-fill-l2': '#222222', '--dsw-alias-fill-tsp-secondary': 'rgba(255, 255, 255, 0.05)',
-      '--dsw-alias-brand-primary': '#76b900', '--dsw-alias-brand-primary-invert': '#000000', '--dsw-alias-brand-text': '#76b900',
-      '--dsw-alias-button-primary-fill': '#76b900', '--dsw-alias-button-primary-hover': '#1eaedb', '--dsw-alias-button-primary-dimmed': '#3f8500', '--dsw-alias-button-contrast-fill': '#ffffff', '--dsw-alias-button-elevated-fill': '#1a1a1a', '--dsw-alias-button-floating-fill': '#1a1a1a', '--dsw-alias-button-floating-hover': '#222222', '--dsw-alias-button-ghost-active-border': '#76b900', '--dsw-alias-button-ghost-active-fill': '#222222', '--dsw-alias-button-ghost-active-hover': '#2a2a2a', '--dsw-alias-button-info-fill': '#1eaedb', '--dsw-alias-button-info-hover': '#007fff', '--dsw-alias-button-tool-bar-fill': '#1a1a1a', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#222222',
-      '--dsw-alias-interactive-bg-hover': '#161616', '--dsw-alias-interactive-bg-active': '#222222', '--dsw-alias-interactive-bg-hover-accent': 'rgba(118, 185, 0, 0.15)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(229, 32, 32, 0.15)', '--dsw-alias-interactive-bg-hover-solid': '#222222',
-      '--dsw-alias-label-primary': '#ffffff', '--dsw-alias-label-secondary': '#a7a7a7', '--dsw-alias-label-tertiary': '#898989', '--dsw-alias-label-quaternary': '#757575', '--dsw-alias-label-caption': '#898989', '--dsw-alias-label-dimmed': '#757575', '--dsw-alias-label-error': '#e52020', '--dsw-alias-label-primary-foreground': '#ffffff', '--dsw-alias-label-primary-inverted': '#000000', '--dsw-alias-label-primary-bluish': '#1eaedb',
-      '--dsw-alias-state-error-primary': '#e52020', '--dsw-alias-state-error-secondary': 'rgba(229, 32, 32, 0.15)', '--dsw-alias-state-success-primary': '#76b900', '--dsw-alias-state-success-secondary': 'rgba(118, 185, 0, 0.15)', '--dsw-alias-state-warn-primary': '#ef9100', '--dsw-alias-state-warn-secondary': 'rgba(239, 145, 0, 0.15)', '--dsw-alias-state-warn-label': '#ef9100',
-      '--dsw-alias-markdown-citation': '#76b900', '--dsw-alias-markdown-code-block': '#1a1a1a', '--dsw-alias-markdown-code-block-banner': '#222222', '--dsw-alias-markdown-inline-code': 'rgba(118, 185, 0, 0.10)', '--dsw-alias-markdown-code-segment-selected': 'rgba(118, 185, 0, 0.18)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#757575', '--dsw-alias-markdown-tag': '#898989',
-      '--dsw-alias-scrollbar-bg-l1': '#2a2a2a', '--dsw-alias-scrollbar-bg-l2': '#222222', '--dsw-alias-scrollbar-hover-l1': '#5e5e5e', '--dsw-alias-scrollbar-hover-l2': '#2a2a2a',
-      '--dsw-alias-toast-bg': '#1a1a1a', '--dsw-alias-tooltip-bg': '#2a2a2a', '--dsw-hovercard-bg': '#222222',
-      '--dsw-specific-sidebar-fill': '#000000', '--dsw-specific-sidebar-nav-item-active': '#222222', '--dsw-specific-sidebar-nav-item-active-accent': '#76b900', '--dsw-specific-sidebar-nav-item-hover': '#161616', '--dsw-specific-bubble': '#1a1a1a', '--dsw-specific-bubble-highlight': '#222222', '--dsw-specific-input-major': '#1a1a1a', '--dsw-specific-login-input': '#1a1a1a', '--dsw-specific-menu': '#222222', '--dsw-specific-selector': '#222222', '--dsw-specific-tip': '#2a2a2a',
-      '--dsw-font-family': SANS, '--dsw-font-mono': MONO, ...FLAT
-    }, SANS)
-
-    const githubDark = fillFontTokens({
-      '--dsw-alias-bg-base': '#0d1117', '--dsw-alias-bg-layer-1': '#161b22', '--dsw-alias-bg-layer-2': '#21262d', '--dsw-alias-bg-layer-3': '#282e35', '--dsw-alias-bg-overlay': '#161b22', '--dsw-alias-bg-multi-select': '#161b22', '--dsw-alias-bg-module-platform': '#161b22', '--dsw-alias-bg-skeleton': '#161b22',
-      '--dsw-alias-border-l1': '#30363d', '--dsw-alias-border-l2': '#3d444d', '--dsw-alias-border-l2-darkmode-thin': '#30363d', '--dsw-alias-border-l3': '#545d68', '--dsw-alias-border-l4': '#6e7681', '--dsw-alias-border-inverted': '#f0f6fc', '--dsw-alias-border-inverted2': '#c9d1d9', '--dsw-alias-separator-primary': '#21262d', '--dsw-alias-line-secondary': '#30363d', '--dsw-alias-fill-l2': '#21262d', '--dsw-alias-fill-tsp-secondary': 'rgba(240, 246, 252, 0.05)',
-      '--dsw-alias-brand-primary': '#2f81f7', '--dsw-alias-brand-primary-invert': '#ffffff', '--dsw-alias-brand-text': '#2f81f7',
-      '--dsw-alias-button-primary-fill': '#238636', '--dsw-alias-button-primary-hover': '#2ea043', '--dsw-alias-button-primary-dimmed': '#1f6e30', '--dsw-alias-button-contrast-fill': '#f0f6fc', '--dsw-alias-button-elevated-fill': '#161b22', '--dsw-alias-button-floating-fill': '#161b22', '--dsw-alias-button-floating-hover': '#21262d', '--dsw-alias-button-ghost-active-border': '#3d444d', '--dsw-alias-button-ghost-active-fill': '#21262d', '--dsw-alias-button-ghost-active-hover': '#282e35', '--dsw-alias-button-info-fill': '#2f81f7', '--dsw-alias-button-info-hover': '#1f6feb', '--dsw-alias-button-tool-bar-fill': '#161b22', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#21262d',
-      '--dsw-alias-interactive-bg-hover': '#161b22', '--dsw-alias-interactive-bg-active': '#21262d', '--dsw-alias-interactive-bg-hover-accent': 'rgba(47, 129, 247, 0.15)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(248, 81, 73, 0.15)', '--dsw-alias-interactive-bg-hover-solid': '#21262d',
-      '--dsw-alias-label-primary': '#f0f6fc', '--dsw-alias-label-secondary': '#c9d1d9', '--dsw-alias-label-tertiary': '#8b949e', '--dsw-alias-label-quaternary': '#6e7681', '--dsw-alias-label-caption': '#8b949e', '--dsw-alias-label-dimmed': '#6e7681', '--dsw-alias-label-error': '#f85149', '--dsw-alias-label-primary-foreground': '#f0f6fc', '--dsw-alias-label-primary-inverted': '#0d1117', '--dsw-alias-label-primary-bluish': '#2f81f7',
-      '--dsw-alias-state-error-primary': '#f85149', '--dsw-alias-state-error-secondary': 'rgba(248, 81, 73, 0.15)', '--dsw-alias-state-success-primary': '#3fb950', '--dsw-alias-state-success-secondary': 'rgba(63, 185, 80, 0.15)', '--dsw-alias-state-warn-primary': '#d29922', '--dsw-alias-state-warn-secondary': 'rgba(210, 153, 34, 0.15)', '--dsw-alias-state-warn-label': '#d29922',
-      '--dsw-alias-markdown-citation': '#2f81f7', '--dsw-alias-markdown-code-block': '#161b22', '--dsw-alias-markdown-code-block-banner': '#21262d', '--dsw-alias-markdown-inline-code': 'rgba(56, 139, 253, 0.15)', '--dsw-alias-markdown-code-segment-selected': 'rgba(47, 129, 247, 0.25)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#6e7681', '--dsw-alias-markdown-tag': '#8b949e',
-      '--dsw-alias-scrollbar-bg-l1': '#30363d', '--dsw-alias-scrollbar-bg-l2': '#21262d', '--dsw-alias-scrollbar-hover-l1': '#545d68', '--dsw-alias-scrollbar-hover-l2': '#30363d',
-      '--dsw-alias-toast-bg': '#161b22', '--dsw-alias-tooltip-bg': '#282e35', '--dsw-hovercard-bg': '#21262d',
-      '--dsw-specific-sidebar-fill': '#0d1117', '--dsw-specific-sidebar-nav-item-active': '#21262d', '--dsw-specific-sidebar-nav-item-active-accent': '#2f81f7', '--dsw-specific-sidebar-nav-item-hover': '#161b22', '--dsw-specific-bubble': '#161b22', '--dsw-specific-bubble-highlight': '#21262d', '--dsw-specific-input-major': '#0d1117', '--dsw-specific-login-input': '#0d1117', '--dsw-specific-menu': '#21262d', '--dsw-specific-selector': '#21262d', '--dsw-specific-tip': '#282e35',
-      '--dsw-font-family': SANS, '--dsw-font-mono': MONO, ...FLAT
-    }, SANS)
-
-    const githubLight = fillFontTokens({
-      '--dsw-alias-bg-base': '#ffffff', '--dsw-alias-bg-layer-1': '#f6f8fa', '--dsw-alias-bg-layer-2': '#eff2f5', '--dsw-alias-bg-layer-3': '#eaeef2', '--dsw-alias-bg-overlay': '#ffffff', '--dsw-alias-bg-multi-select': '#f6f8fa', '--dsw-alias-bg-module-platform': '#f6f8fa', '--dsw-alias-bg-skeleton': '#f6f8fa',
-      '--dsw-alias-border-l1': '#d0d7de', '--dsw-alias-border-l2': '#afb8c1', '--dsw-alias-border-l2-darkmode-thin': '#d0d7de', '--dsw-alias-border-l3': '#8c959f', '--dsw-alias-border-l4': '#57606a', '--dsw-alias-border-inverted': '#1f2328', '--dsw-alias-border-inverted2': '#656d76', '--dsw-alias-separator-primary': '#d8dee4', '--dsw-alias-line-secondary': '#eff2f5', '--dsw-alias-fill-l2': '#eff2f5', '--dsw-alias-fill-tsp-secondary': 'rgba(31, 35, 40, 0.04)',
-      '--dsw-alias-brand-primary': '#0969da', '--dsw-alias-brand-primary-invert': '#ffffff', '--dsw-alias-brand-text': '#0969da',
-      '--dsw-alias-button-primary-fill': '#1f883d', '--dsw-alias-button-primary-hover': '#1a7f37', '--dsw-alias-button-primary-dimmed': '#16795c', '--dsw-alias-button-contrast-fill': '#1f2328', '--dsw-alias-button-elevated-fill': '#ffffff', '--dsw-alias-button-floating-fill': '#ffffff', '--dsw-alias-button-floating-hover': '#f6f8fa', '--dsw-alias-button-ghost-active-border': '#afb8c1', '--dsw-alias-button-ghost-active-fill': '#eff2f5', '--dsw-alias-button-ghost-active-hover': '#eaeef2', '--dsw-alias-button-info-fill': '#0969da', '--dsw-alias-button-info-hover': '#0550ae', '--dsw-alias-button-tool-bar-fill': '#f6f8fa', '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': '#eff2f5',
-      '--dsw-alias-interactive-bg-hover': '#f6f8fa', '--dsw-alias-interactive-bg-active': '#eff2f5', '--dsw-alias-interactive-bg-hover-accent': 'rgba(9, 105, 218, 0.10)', '--dsw-alias-interactive-bg-hover-danger': 'rgba(207, 34, 46, 0.08)', '--dsw-alias-interactive-bg-hover-solid': '#eff2f5',
-      '--dsw-alias-label-primary': '#1f2328', '--dsw-alias-label-secondary': '#1f2328', '--dsw-alias-label-tertiary': '#656d76', '--dsw-alias-label-quaternary': '#8c959f', '--dsw-alias-label-caption': '#656d76', '--dsw-alias-label-dimmed': '#8c959f', '--dsw-alias-label-error': '#cf222e', '--dsw-alias-label-primary-foreground': '#ffffff', '--dsw-alias-label-primary-inverted': '#ffffff', '--dsw-alias-label-primary-bluish': '#0969da',
-      '--dsw-alias-state-error-primary': '#cf222e', '--dsw-alias-state-error-secondary': 'rgba(207, 34, 46, 0.08)', '--dsw-alias-state-success-primary': '#1a7f37', '--dsw-alias-state-success-secondary': 'rgba(26, 127, 55, 0.10)', '--dsw-alias-state-warn-primary': '#9a6700', '--dsw-alias-state-warn-secondary': 'rgba(154, 103, 0, 0.10)', '--dsw-alias-state-warn-label': '#9a6700',
-      '--dsw-alias-markdown-citation': '#0969da', '--dsw-alias-markdown-code-block': '#f6f8fa', '--dsw-alias-markdown-code-block-banner': '#eff2f5', '--dsw-alias-markdown-inline-code': 'rgba(9, 105, 218, 0.08)', '--dsw-alias-markdown-code-segment-selected': 'rgba(9, 105, 218, 0.12)', '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': '#8c959f', '--dsw-alias-markdown-tag': '#656d76',
-      '--dsw-alias-scrollbar-bg-l1': '#d0d7de', '--dsw-alias-scrollbar-bg-l2': '#eff2f5', '--dsw-alias-scrollbar-hover-l1': '#afb8c1', '--dsw-alias-scrollbar-hover-l2': '#d0d7de',
-      '--dsw-alias-toast-bg': '#ffffff', '--dsw-alias-tooltip-bg': '#1f2328', '--dsw-hovercard-bg': '#ffffff',
-      '--dsw-specific-sidebar-fill': '#f6f8fa', '--dsw-specific-sidebar-nav-item-active': '#eff2f5', '--dsw-specific-sidebar-nav-item-active-accent': '#0969da', '--dsw-specific-sidebar-nav-item-hover': '#eff2f5', '--dsw-specific-bubble': '#f6f8fa', '--dsw-specific-bubble-highlight': '#eff2f5', '--dsw-specific-input-major': '#f6f8fa', '--dsw-specific-login-input': '#f6f8fa', '--dsw-specific-menu': '#ffffff', '--dsw-specific-selector': '#ffffff', '--dsw-specific-tip': '#1f2328',
-      '--dsw-shadow-lv1': '0 1px 0 rgba(31, 35, 40, 0.04)', '--dsw-shadow-lv2': '0 1px 3px rgba(31, 35, 40, 0.06)', '--dsw-shadow-lv3': '0 1px 5px rgba(31, 35, 40, 0.08)', '--dsw-shadow-lv1-blur': '1px',
-      '--dsw-font-family': SANS, '--dsw-font-mono': MONO
-    }, SANS)
-
-    /* ── 主题目录（与 lib/themes/index.js 的 THEME_CATALOG 同源）──
-     * gradient：卡片渐变背景（QQ 调色盘观感）；group：分组归属。 */
     const THEMES = [
-      { id: 'opencode-terminal-dark', colorScheme: 'dark', tokens: opencodeDark, label: '暱夜终端', desc: '暖黑 + Apple 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#201d1d,#302c2c 60%,#007aff)' },
-      { id: 'opencode-terminal-light', colorScheme: 'light', tokens: opencodeLight, label: '纸感终端', desc: '暖白 + 暖灰', group: '终端美学', gradient: 'linear-gradient(135deg,#fdfcfc,#f1eeee 60%,#e2dcdc)' },
-      { id: 'github-dark', colorScheme: 'dark', tokens: githubDark, label: 'GitHub 暗色', desc: '#0d1117 + Primer 蓝', group: '终端美学', gradient: 'linear-gradient(135deg,#0d1117,#161b22 60%,#2f81f7)' },
-      { id: 'github-light', colorScheme: 'light', tokens: githubLight, label: 'GitHub 亮色', desc: '纯白 + #0969da', group: '终端美学', gradient: 'linear-gradient(135deg,#ffffff,#f6f8fa 60%,#0969da)' },
-      { id: 'linear-dark', colorScheme: 'dark', tokens: linearDark, label: 'Linear 无彩', desc: '近黑 + Indigo', group: '极简风物', gradient: 'linear-gradient(135deg,#08090a,#191a1b 55%,#5e6ad2)' },
-      { id: 'notion-light', colorScheme: 'light', tokens: notionLight, label: 'Notion 暖白', desc: '纯白 + 暖灰', group: '极简风物', gradient: 'linear-gradient(135deg,#ffffff,#f6f5f4 55%,#e8e7e5)' },
-      { id: 'claude-parchment-light', colorScheme: 'light', tokens: claudeLight, label: 'Claude 羊皮纸', desc: '羊皮纸 + 赤陶', group: '极简风物', gradient: 'linear-gradient(135deg,#f5f4ed,#faf9f5 55%,#c96442)' },
-      { id: 'nvidia-dark', colorScheme: 'dark', tokens: nvidiaDark, label: 'NVIDIA 硬核', desc: '纯黑 + 信号绿', group: '极简风物', gradient: 'linear-gradient(135deg,#000000,#1a1a1a 55%,#76b900)' },
+      { id: 'opencode-terminal-dark', colorScheme: 'dark', label: 'OpenCode 暱夜终端', desc: '暖黑 #201d1d + Apple 蓝，全站 mono', group: '终端美学', swatch: ['#201d1d', '#302c2c', '#007aff', '#30d158'] },
+      { id: 'opencode-terminal-light', colorScheme: 'light', label: 'OpenCode 纸感终端', desc: '暖白 #fdfcfc + 暖灰层次', group: '终端美学', swatch: ['#fdfcfc', '#f1eeee', '#201d1d', '#007aff'] },
+      { id: 'github-dark', colorScheme: 'dark', label: 'GitHub 暗色 Primer', desc: '#0d1117 + Primer 蓝 #2f81f7', group: '终端美学', swatch: ['#0d1117', '#161b22', '#2f81f7', '#3fb950'] },
+      { id: 'github-light', colorScheme: 'light', label: 'GitHub 亮色 Primer', desc: '纯白 + #0969da + 绿色按钮', group: '终端美学', swatch: ['#ffffff', '#f6f8fa', '#0969da', '#1f883d'] },
+      { id: 'linear-dark', colorScheme: 'dark', label: 'Linear 暗夜无彩', desc: '近黑 #08090a + Indigo #5e6ad2', group: '极简风物', swatch: ['#08090a', '#191a1b', '#5e6ad2', '#f7f8f8'] },
+      { id: 'notion-light', colorScheme: 'light', label: 'Notion 暖白极简', desc: '纯白 + 暖灰 + Notion 蓝', group: '极简风物', swatch: ['#ffffff', '#f6f5f4', '#31302e', '#0075de'] },
+      { id: 'claude-parchment-light', colorScheme: 'light', label: 'Claude 羊皮纸', desc: '羊皮纸 #f5f4ed + 赤陶 #c96442', group: '极简风物', swatch: ['#f5f4ed', '#faf9f5', '#c96442', '#141413'] },
+      { id: 'nvidia-dark', colorScheme: 'dark', label: 'NVIDIA 硬核绿', desc: '纯黑 #000 + 信号绿 #76b900', group: '极简风物', swatch: ['#000000', '#1a1a1a', '#76b900', '#ffffff'] },
+      { id: 'replicate-light', colorScheme: 'light', label: 'Replicate 开发者红', desc: '纯白 #ffffff + 品牌红 #ea2804', swatch: ['#ffffff', '#f8f8f8', '#ea2804', '#202020'] },
+      { id: 'cisco-dark', colorScheme: 'dark', label: 'Cisco 信任蓝', desc: '藏青 #0f1720 + 信号蓝 #049fd9', swatch: ['#0f1720', '#1b2530', '#049fd9', '#ffffff'] },
+      { id: 'neobrutalism-light', colorScheme: 'light', label: 'Neobrutalism 粗野拼贴', desc: '奶油 #fff4cf + 橘红 #d24b1f', swatch: ['#fff4cf', '#fffaf0', '#d24b1f', '#2a1810'] },
+      { id: 'mission-control-dark', colorScheme: 'dark', label: 'Mission Control 深空', desc: '深空 #090b12 + 指挥蓝 #60a5fa', swatch: ['#090b12', '#121722', '#60a5fa', '#f8fafc'] },
+      { id: 'levels-light', colorScheme: 'light', label: 'Levels 纸感评审', desc: '米纸 #fbf7ef + 代谢绿 #2f8f46', swatch: ['#fbf7ef', '#ffffff', '#2f8f46', '#1f2a24'] },
+      { id: 'arc-light', colorScheme: 'light', label: 'Arc 蜜桃珊瑚', desc: '蜜桃 #fdf3ec + 珊瑚 #ff5f5f', swatch: ['#fdf3ec', '#ffffff', '#ff5f5f', '#1a1a1f'] },
+      { id: 'luxury-dark', colorScheme: 'dark', label: 'Luxury 鎏金黑', desc: '曜石 #080706 + 鎏金 #c6a15b', swatch: ['#080706', '#151310', '#c6a15b', '#fff8ea'] },
+      { id: 'skeumorphism-light', colorScheme: 'light', label: 'Skeumorphism 拟物陶土', desc: '陶土 #f7eee6 + 陶釉 #b46a46', swatch: ['#f7eee6', '#fff8f1', '#b46a46', '#2b211c'] },
+      { id: 'wechat-light', colorScheme: 'light', label: 'WeChat 微信绿', desc: '浅灰 #ededed + 微信绿 #07c160', swatch: ['#ededed', '#f7f7f7', '#07c160', '#1a1a1a'] },
+      { id: 'xiaohongshu-light', colorScheme: 'light', label: '小红书 种草红', desc: '米灰 #f5f5f5 + 种草红 #ff2442', swatch: ['#f5f5f5', '#ffffff', '#ff2442', 'rgba(0, 0, 0, 0.8)'] },
+      { id: 'discord-dark', colorScheme: 'dark', label: 'Discord Blurple夜', desc: '深灰 #313338 + Blurple #5865f2', swatch: ['#313338', '#2b2d31', '#5865f2', '#dbdee1'] },
+      { id: 'supabase-dark', colorScheme: 'dark', label: 'Supabase 翡翠夜', desc: '墨黑 #171717 + 翡翠绿 #3ecf8e', swatch: ['#171717', '#1c1c1c', '#3ecf8e', '#fafafa'] },
+      { id: 'nebula-dark', colorScheme: 'dark', label: 'Nebula 星云紫', desc: '紫黑 #0d0a1a + 霓紫 #8b5cf6', swatch: ['#0d0a1a', '#161230', '#8b5cf6', '#f1edfd'] },
+      { id: 'sakura-light', colorScheme: 'light', label: 'Sakura 樱粉', desc: '樱白 #fff9fa + 樱粉 #e75480', swatch: ['#fff9fa', '#fbeef2', '#e75480', '#432635'] },
+      { id: 'tide-dark', colorScheme: 'dark', label: 'Tide 潮汐青', desc: '深青 #062a2c + 潮汐 #2dd4bf', swatch: ['#062a2c', '#0b3538', '#2dd4bf', '#eafaf8'] }
     ]
 
-    /* 分组定义（QQ 调色盘式：组名 + 文艺副标题）。 */
-    const GROUPS = [
-      { name: '终端美学', sub: '代码即诗，暗色为主的两端开发味' },
-      { name: '极简风物', sub: '少即是多，克制的品牌色' }
-    ]
 
     /* ── 图片取色主题（与 lib/themes/photo.js 同源）── */
     function hexToHsl(hex) {
@@ -267,72 +185,207 @@ window.__ModuleLoader__.load({
     }
 
     function extractPalette(data) {
-      const accent = extractDominant(data)
-      const { h, s } = hexToHsl(accent)
+      const seed = extractDominant(data)
+      const seedHsl = hexToHsl(seed)
       return {
-        accent,
-        companionA: hslToHex(h + 28, Math.min(0.85, s + 0.05), 0.52),
-        companionB: hslToHex(h - 28, Math.min(0.8, s), 0.46)
+        accent: seed,
+        companionA: hslToHex(seedHsl.h + 60, Math.min(0.85, seedHsl.s), 0.52),
+        companionB: hslToHex(seedHsl.h, Math.min(0.5, seedHsl.s * 0.45), 0.5)
       }
     }
 
-    /** 调色盘 → 完整主题 token（亮/暗双份，与 lib/themes/photo.js 同源）。 */
-    function buildPhotoTokens(palette, scheme) {
-      const { accent } = palette
-      const { h, s } = hexToHsl(accent)
-      const dark = scheme === 'dark'
-      const base = dark
-        ? { bg: hslToHex(h, Math.min(0.5, s * 0.7), 0.07), l1: hslToHex(h, Math.min(0.45, s * 0.6), 0.11), l2: hslToHex(h, Math.min(0.42, s * 0.55), 0.145), l3: hslToHex(h, Math.min(0.4, s * 0.5), 0.18) }
-        : { bg: hslToHex(h, 0.28, 0.97), l1: hslToHex(h, 0.22, 0.94), l2: hslToHex(h, 0.18, 0.91), l3: hslToHex(h, 0.16, 0.88) }
-      const brand = dark ? hslToHex(h, Math.max(0.55, s), 0.62) : hslToHex(h, Math.max(0.6, s), 0.42)
-      const brandHover = dark ? hslToHex(h, Math.max(0.55, s), 0.72) : hslToHex(h, Math.max(0.6, s), 0.34)
-      const textPrimary = dark ? hslToHex(h, 0.08, 0.95) : hslToHex(h, 0.35, 0.12)
-      const textSecondary = dark ? hslToHex(h, 0.06, 0.78) : hslToHex(h, 0.22, 0.28)
-      const textTertiary = dark ? hslToHex(h, 0.05, 0.6) : hslToHex(h, 0.16, 0.45)
-      const textQuaternary = dark ? hslToHex(h, 0.05, 0.44) : hslToHex(h, 0.12, 0.6)
-      const border1 = dark ? hslToHex(h, 0.3, 0.2) : hslToHex(h, 0.24, 0.86)
-      const border2 = dark ? hslToHex(h, 0.35, 0.3) : hslToHex(h, 0.3, 0.74)
-      const hover = dark ? hslToHex(h, 0.3, 0.15) : hslToHex(h, 0.3, 0.92)
-      const active = dark ? hslToHex(h, 0.32, 0.2) : hslToHex(h, 0.32, 0.88)
+    /* ── Material You 动态取色：seed → 5 组 ref 调色板 → MD3 sys 色彩 ──
+     * 与 lib/themes/photo.js 同源（HSL 近似，色调号≈明度%；导出用 MD3 令牌命名）。 */
+    const M3_TONES = [0, 4, 6, 10, 12, 17, 20, 22, 24, 25, 30, 35, 40, 50, 60, 70, 80, 87, 90, 92, 94, 95, 96, 98, 99, 100]
+    const M3_PREVIEW_TONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 95]
+    const M3_REF_NAMES = { primary: 'primary', secondary: 'secondary', tertiary: 'tertiary', neutral: 'neutral', neutralVariant: 'neutral-variant', error: 'error' }
+    const M3_SYS_NAMES = {
+      primary: 'primary', onPrimary: 'on-primary', primaryContainer: 'primary-container', onPrimaryContainer: 'on-primary-container',
+      secondary: 'secondary', onSecondary: 'on-secondary', secondaryContainer: 'secondary-container', onSecondaryContainer: 'on-secondary-container',
+      tertiary: 'tertiary', onTertiary: 'on-tertiary', tertiaryContainer: 'tertiary-container', onTertiaryContainer: 'on-tertiary-container',
+      error: 'error', onError: 'on-error', errorContainer: 'error-container', onErrorContainer: 'on-error-container',
+      background: 'background', onBackground: 'on-background',
+      surfaceDim: 'surface-dim', surface: 'surface', surfaceBright: 'surface-bright',
+      surfaceContainerLowest: 'surface-container-lowest', surfaceContainerLow: 'surface-container-low', surfaceContainer: 'surface-container',
+      surfaceContainerHigh: 'surface-container-high', surfaceContainerHighest: 'surface-container-highest',
+      onSurface: 'on-surface', onSurfaceVariant: 'on-surface-variant', outline: 'outline', outlineVariant: 'outline-variant',
+      shadow: 'shadow', scrim: 'scrim', inverseSurface: 'inverse-surface', inverseOnSurface: 'inverse-on-surface',
+      inversePrimary: 'inverse-primary', surfaceTint: 'surface-tint'
+    }
+    function m3Tone(h, s, t) {
+      if (t <= 0) return '#000000'
+      if (t >= 100) return '#ffffff'
+      return hslToHex(h, s, t / 100)
+    }
+    function buildM3Palettes(seed) {
+      const parsed = hexToHsl(seed)
+      const h = parsed.h
+      const s = parsed.s
+      const clampS = (v) => Math.min(0.9, Math.max(0, v))
+      const defs = {
+        primary: { h, s: clampS(Math.max(s, 0.45)) },
+        secondary: { h, s: clampS(s * 0.45) },
+        tertiary: { h: (h + 60) % 360, s: clampS(Math.max(s * 0.6, 0.3)) },
+        neutral: { h, s: clampS(Math.min(s * 0.12, 0.08)) },
+        neutralVariant: { h, s: clampS(Math.min(Math.max(s * 0.3, 0.1), 0.2)) },
+        error: { h: 4, s: 0.72 }
+      }
+      const out = { seed }
+      for (const key of Object.keys(defs)) {
+        const tones = {}
+        for (const t of M3_TONES) tones[t] = m3Tone(defs[key].h, defs[key].s, t)
+        out[key] = tones
+      }
+      return out
+    }
+    function buildM3Scheme(pal, scheme) {
+      const P = pal.primary
+      const S = pal.secondary
+      const T = pal.tertiary
+      const N = pal.neutral
+      const NV = pal.neutralVariant
+      const E = pal.error
+      if (scheme === 'dark') {
+        return {
+          primary: P[80], onPrimary: P[20], primaryContainer: P[30], onPrimaryContainer: P[90],
+          secondary: S[80], onSecondary: S[20], secondaryContainer: S[30], onSecondaryContainer: S[90],
+          tertiary: T[80], onTertiary: T[20], tertiaryContainer: T[30], onTertiaryContainer: T[90],
+          error: E[80], onError: E[20], errorContainer: E[30], onErrorContainer: E[90],
+          background: N[6], onBackground: N[90],
+          surfaceDim: N[6], surface: N[6], surfaceBright: N[24],
+          surfaceContainerLowest: N[4], surfaceContainerLow: N[10], surfaceContainer: N[12],
+          surfaceContainerHigh: N[17], surfaceContainerHighest: N[22],
+          onSurface: N[90], onSurfaceVariant: NV[80],
+          outline: NV[60], outlineVariant: NV[30],
+          shadow: '#000000', scrim: '#000000',
+          inverseSurface: N[90], inverseOnSurface: N[20], inversePrimary: P[40],
+          surfaceTint: P[80]
+        }
+      }
       return {
-        '--dsw-alias-bg-base': base.bg, '--dsw-alias-bg-layer-1': base.l1, '--dsw-alias-bg-layer-2': base.l2, '--dsw-alias-bg-layer-3': base.l3,
-        '--dsw-alias-bg-overlay': base.l1, '--dsw-alias-bg-multi-select': base.l2, '--dsw-alias-bg-module-platform': base.l1, '--dsw-alias-bg-skeleton': base.l2,
+        primary: P[40], onPrimary: P[100], primaryContainer: P[90], onPrimaryContainer: P[10],
+        secondary: S[40], onSecondary: S[100], secondaryContainer: S[90], onSecondaryContainer: S[10],
+        tertiary: T[40], onTertiary: T[100], tertiaryContainer: T[90], onTertiaryContainer: T[10],
+        error: E[40], onError: E[100], errorContainer: E[90], onErrorContainer: E[10],
+        background: N[99], onBackground: N[10],
+        surfaceDim: N[87], surface: N[99], surfaceBright: N[100],
+        surfaceContainerLowest: N[100], surfaceContainerLow: N[96], surfaceContainer: N[94],
+        surfaceContainerHigh: N[92], surfaceContainerHighest: N[90],
+        onSurface: N[10], onSurfaceVariant: NV[30],
+        outline: NV[50], outlineVariant: NV[80],
+        shadow: '#000000', scrim: '#000000',
+        inverseSurface: N[20], inverseOnSurface: N[95], inversePrimary: P[80],
+        surfaceTint: P[40]
+      }
+    }
+
+    /** seed → MD3 导出 CSS（--md-ref-palette-* + --md-sys-color-*-light/dark）。 */
+    function buildM3ExportCss(seed) {
+      const pal = buildM3Palettes(seed)
+      const lines = [':root {', '  /* seed: ' + seed + ' · Material You (MD3) · exported by dshp-inx-custom-ui */']
+      for (const key of Object.keys(M3_REF_NAMES)) {
+        for (const t of M3_TONES) lines.push('  --md-ref-palette-' + M3_REF_NAMES[key] + t + ': ' + pal[key][t] + ';')
+      }
+      const schemes = { light: buildM3Scheme(pal, 'light'), dark: buildM3Scheme(pal, 'dark') }
+      for (const sk of ['light', 'dark']) {
+        lines.push('  /* sys-' + sk + ' */')
+        const roles = schemes[sk]
+        for (const role of Object.keys(M3_SYS_NAMES)) {
+          lines.push('  --md-sys-color-' + M3_SYS_NAMES[role] + '-' + sk + ': ' + roles[role] + ';')
+        }
+      }
+      lines.push('}')
+      return lines.join('\n')
+    }
+
+    function copyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          const p = navigator.clipboard.writeText(text)
+          if (p && typeof p.then === 'function') return p
+        } catch (e) { /* 走 fallback */ }
+      }
+      return new Promise(function (resolve, reject) {
+        try {
+          const ta = document.createElement('textarea')
+          ta.value = text
+          ta.style.position = 'fixed'
+          ta.style.opacity = '0'
+          document.body.appendChild(ta)
+          ta.select()
+          const ok = document.execCommand('copy')
+          ta.remove()
+          if (ok) resolve()
+          else reject(new Error('copy failed'))
+        } catch (e) { reject(e) }
+      })
+    }
+
+    /** seed → 壁纸主题运行时 { seed, palettes, dark, light }。 */
+    function buildWallpaperTheme(seed) {
+      const palettes = buildM3Palettes(seed)
+      return { seed, palettes, dark: buildPhotoTokens(palettes, 'dark'), light: buildPhotoTokens(palettes, 'light') }
+    }
+
+    /** MD3 sys 色彩 → DSH 单侧 --dsw-* token（与 lib/themes/photo.js 同源）。
+     *  入参 ref 调色板或 seed/持久化 palette（seed 恒等于 accent，兼容旧数据）。 */
+    function buildPhotoTokens(seedOrPalettes, scheme) {
+      const pal = (seedOrPalettes && seedOrPalettes.primary) ? seedOrPalettes : buildM3Palettes(
+        typeof seedOrPalettes === 'string' ? seedOrPalettes : (seedOrPalettes.seed || seedOrPalettes.accent))
+      const m = buildM3Scheme(pal, scheme)
+      const dark = scheme === 'dark'
+      const brand = m.primary
+      const brandHover = dark ? pal.primary[70] : pal.primary[30]
+      const info = m.tertiary
+      const infoHover = dark ? pal.tertiary[70] : pal.tertiary[30]
+      const textPrimary = m.onSurface
+      const textSecondary = withAlpha(m.onSurface, dark ? 0.8 : 0.72)
+      const textTertiary = m.onSurfaceVariant
+      const textQuaternary = m.outline
+      const border1 = m.outlineVariant
+      const border2 = m.outline
+      const hover = m.surfaceContainerHighest
+      const active = m.surfaceContainerHigh
+      const err = m.error
+      return {
+        '--dsw-alias-bg-base': m.surface, '--dsw-alias-bg-layer-1': m.surfaceContainerLow, '--dsw-alias-bg-layer-2': m.surfaceContainer, '--dsw-alias-bg-layer-3': m.surfaceContainerHigh,
+        '--dsw-alias-bg-overlay': m.surfaceContainerLow, '--dsw-alias-bg-multi-select': m.surfaceContainer, '--dsw-alias-bg-module-platform': m.surfaceContainerLow, '--dsw-alias-bg-skeleton': m.surfaceContainer,
         '--dsw-alias-border-l1': border1, '--dsw-alias-border-l2': border2, '--dsw-alias-border-l2-darkmode-thin': border1, '--dsw-alias-border-l3': border2,
         '--dsw-alias-border-l4': dark ? textTertiary : border2, '--dsw-alias-border-inverted': textPrimary, '--dsw-alias-border-inverted2': textSecondary,
-        '--dsw-alias-separator-primary': border1, '--dsw-alias-line-secondary': base.l2, '--dsw-alias-fill-l2': base.l2,
-        '--dsw-alias-fill-tsp-secondary': dark ? withAlpha(textPrimary, 0.05) : withAlpha(textPrimary, 0.04),
-        '--dsw-alias-brand-primary': brand, '--dsw-alias-brand-primary-invert': dark ? base.bg : '#ffffff', '--dsw-alias-brand-text': brand,
+        '--dsw-alias-separator-primary': border1, '--dsw-alias-line-secondary': m.surfaceContainer, '--dsw-alias-fill-l2': m.surfaceContainer,
+        '--dsw-alias-fill-tsp-secondary': withAlpha(m.onSurface, dark ? 0.05 : 0.04),
+        '--dsw-alias-brand-primary': brand, '--dsw-alias-brand-primary-invert': m.onPrimary, '--dsw-alias-brand-text': brand,
         '--dsw-alias-button-primary-fill': brand, '--dsw-alias-button-primary-hover': brandHover, '--dsw-alias-button-primary-dimmed': brandHover,
-        '--dsw-alias-button-contrast-fill': textPrimary, '--dsw-alias-button-elevated-fill': base.l1, '--dsw-alias-button-floating-fill': base.l1,
-        '--dsw-alias-button-floating-hover': base.l2, '--dsw-alias-button-ghost-active-border': border2, '--dsw-alias-button-ghost-active-fill': hover,
-        '--dsw-alias-button-ghost-active-hover': active, '--dsw-alias-button-info-fill': brand, '--dsw-alias-button-info-hover': brandHover,
-        '--dsw-alias-button-tool-bar-fill': base.l1, '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': hover,
+        '--dsw-alias-button-contrast-fill': m.onSurface, '--dsw-alias-button-elevated-fill': m.surfaceContainerLow, '--dsw-alias-button-floating-fill': m.surfaceContainerLow,
+        '--dsw-alias-button-floating-hover': m.surfaceContainer, '--dsw-alias-button-ghost-active-border': border2, '--dsw-alias-button-ghost-active-fill': hover,
+        '--dsw-alias-button-ghost-active-hover': active, '--dsw-alias-button-info-fill': info, '--dsw-alias-button-info-hover': infoHover,
+        '--dsw-alias-button-tool-bar-fill': m.surfaceContainerLow, '--dsw-alias-button-tool-bar-fill-invisible': 'transparent', '--dsw-alias-button-tool-bar-hover': hover,
         '--dsw-alias-interactive-bg-hover': hover, '--dsw-alias-interactive-bg-active': active,
-        '--dsw-alias-interactive-bg-hover-accent': withAlpha(brand, dark ? 0.2 : 0.12), '--dsw-alias-interactive-bg-hover-danger': withAlpha('#ef4444', dark ? 0.18 : 0.1),
+        '--dsw-alias-interactive-bg-hover-accent': withAlpha(brand, dark ? 0.2 : 0.12), '--dsw-alias-interactive-bg-hover-danger': withAlpha(err, dark ? 0.18 : 0.1),
         '--dsw-alias-interactive-bg-hover-solid': active,
         '--dsw-alias-label-primary': textPrimary, '--dsw-alias-label-secondary': textSecondary, '--dsw-alias-label-tertiary': textTertiary,
         '--dsw-alias-label-quaternary': textQuaternary, '--dsw-alias-label-caption': textTertiary, '--dsw-alias-label-dimmed': textQuaternary,
-        '--dsw-alias-label-error': dark ? '#f87171' : '#dc2626', '--dsw-alias-label-primary-foreground': dark ? textPrimary : '#ffffff',
-        '--dsw-alias-label-primary-inverted': dark ? base.bg : '#ffffff', '--dsw-alias-label-primary-bluish': brand,
-        '--dsw-alias-state-error-primary': dark ? '#f87171' : '#dc2626', '--dsw-alias-state-error-secondary': withAlpha('#ef4444', dark ? 0.15 : 0.1),
+        '--dsw-alias-label-error': err, '--dsw-alias-label-primary-foreground': dark ? textPrimary : '#ffffff',
+        '--dsw-alias-label-primary-inverted': dark ? m.surface : '#ffffff', '--dsw-alias-label-primary-bluish': brand,
+        '--dsw-alias-state-error-primary': err, '--dsw-alias-state-error-secondary': withAlpha(err, dark ? 0.15 : 0.1),
         '--dsw-alias-state-success-primary': dark ? '#4ade80' : '#16a34a', '--dsw-alias-state-success-secondary': withAlpha('#22c55e', dark ? 0.15 : 0.1),
         '--dsw-alias-state-warn-primary': dark ? '#fbbf24' : '#d97706', '--dsw-alias-state-warn-secondary': withAlpha('#f59e0b', dark ? 0.15 : 0.1),
         '--dsw-alias-state-warn-label': dark ? '#fbbf24' : '#b45309',
-        '--dsw-alias-markdown-citation': brand, '--dsw-alias-markdown-code-block': base.l1, '--dsw-alias-markdown-code-block-banner': base.l2,
+        '--dsw-alias-markdown-citation': brand, '--dsw-alias-markdown-code-block': m.surfaceContainerLow, '--dsw-alias-markdown-code-block-banner': m.surfaceContainer,
         '--dsw-alias-markdown-inline-code': withAlpha(brand, dark ? 0.14 : 0.1), '--dsw-alias-markdown-code-segment-selected': withAlpha(brand, dark ? 0.25 : 0.16),
         '--dsw-alias-markdown-code-segment-unselected': 'transparent', '--dsw-alias-markdown-placeholder': textQuaternary, '--dsw-alias-markdown-tag': textTertiary,
-        '--dsw-alias-scrollbar-bg-l1': border2, '--dsw-alias-scrollbar-bg-l2': base.l2, '--dsw-alias-scrollbar-hover-l1': textTertiary, '--dsw-alias-scrollbar-hover-l2': border2,
-        '--dsw-alias-toast-bg': base.l1, '--dsw-alias-tooltip-bg': dark ? base.l3 : hslToHex(h, 0.35, 0.14), '--dsw-hovercard-bg': base.l1,
-        '--dsw-specific-sidebar-fill': base.bg, '--dsw-specific-sidebar-nav-item-active': active, '--dsw-specific-sidebar-nav-item-active-accent': brand,
-        '--dsw-specific-sidebar-nav-item-hover': hover, '--dsw-specific-bubble': base.l1, '--dsw-specific-bubble-highlight': base.l2,
-        '--dsw-specific-input-major': base.l1, '--dsw-specific-login-input': base.l1, '--dsw-specific-menu': base.l1,
-        '--dsw-specific-selector': base.l1, '--dsw-specific-tip': base.l2,
+        '--dsw-alias-scrollbar-bg-l1': border2, '--dsw-alias-scrollbar-bg-l2': m.surfaceContainer, '--dsw-alias-scrollbar-hover-l1': textTertiary, '--dsw-alias-scrollbar-hover-l2': border2,
+        '--dsw-alias-toast-bg': m.inverseSurface, '--dsw-alias-tooltip-bg': m.inverseSurface, '--dsw-hovercard-bg': m.surfaceContainerLow,
+        '--dsw-specific-sidebar-fill': m.surface, '--dsw-specific-sidebar-nav-item-active': active, '--dsw-specific-sidebar-nav-item-active-accent': brand,
+        '--dsw-specific-sidebar-nav-item-hover': hover, '--dsw-specific-bubble': m.surfaceContainerLow, '--dsw-specific-bubble-highlight': m.surfaceContainer,
+        '--dsw-specific-input-major': m.surfaceContainerLow, '--dsw-specific-login-input': m.surfaceContainerLow, '--dsw-specific-menu': m.surfaceContainer,
+        '--dsw-specific-selector': m.surfaceContainer, '--dsw-specific-tip': m.surfaceContainer,
         '--dsw-shadow-lv1': dark ? '0 2px 8px rgba(0,0,0,0.4)' : '0 1px 3px rgba(0,0,0,0.08)',
         '--dsw-shadow-lv2': dark ? '0 4px 16px rgba(0,0,0,0.45)' : '0 2px 8px rgba(0,0,0,0.08)',
         '--dsw-shadow-lv3': dark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 4px 16px rgba(0,0,0,0.1)', '--dsw-shadow-lv1-blur': '8px',
         '--dshp-cu-body-gradient': dark
-          ? 'radial-gradient(1000px 600px at 85% -10%, ' + withAlpha(palette.companionA, 0.16) + ', transparent 55%), radial-gradient(900px 560px at 8% 108%, ' + withAlpha(palette.companionB, 0.13) + ', transparent 58%), linear-gradient(180deg, ' + base.bg + ', ' + hslToHex(h, Math.min(0.5, s * 0.7), 0.05) + ')'
-          : 'radial-gradient(1000px 600px at 85% -10%, ' + withAlpha(palette.companionA, 0.22) + ', transparent 55%), radial-gradient(900px 560px at 8% 108%, ' + withAlpha(palette.companionB, 0.18) + ', transparent 58%), linear-gradient(180deg, ' + base.bg + ', ' + hslToHex(h, 0.28, 0.99) + ')',
+          ? 'radial-gradient(1000px 600px at 85% -10%, ' + withAlpha(m.tertiary, 0.16) + ', transparent 55%), radial-gradient(900px 560px at 8% 108%, ' + withAlpha(m.secondary, 0.13) + ', transparent 58%), linear-gradient(180deg, ' + m.surface + ', ' + pal.neutral[4] + ')'
+          : 'radial-gradient(1000px 600px at 85% -10%, ' + withAlpha(m.tertiary, 0.22) + ', transparent 55%), radial-gradient(900px 560px at 8% 108%, ' + withAlpha(m.secondary, 0.18) + ', transparent 58%), linear-gradient(180deg, ' + m.surface + ', ' + pal.neutral[96] + ')',
         '--dsw-font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
         '--dsw-font-mono': '"Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace'
       }
@@ -358,9 +411,9 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /* 图片主题的运行时登记表：id 'photo:<hash>'；palette 持久化到 settings。 */
+    /* 壁纸 MD3 主题运行时：{ seed, palettes, dark, light }；seed 持久化到 settings（= photoPalette.accent）。 */
     const PHOTO_ID = 'photo:custom'
-    let photoTheme = null /* { palette, dark, light } */
+    let photoTheme = null
     /* apply 作用域的 renderBodyGradient 注入桥（Gallery 的 theme/change 监听调用） */
     const renderBodyGradientRef = { fn: null }
 
@@ -385,11 +438,27 @@ window.__ModuleLoader__.load({
     }
 
 
-    /* ── 持久化桥：Host 半的 settings 路由（dshp-inx-custom-ui 命名空间）── */
+    /* ── 持久化桥：Host 半的 settings 路由（dshp-inx-custom-ui 命名空间）──
+     * themes()：主题目录全量 token（单源 lib/themes），内存缓存一次，切换/恢复时用。 */
     function createBridge() {
       const state = async () => {
         const response = await fetch('/ext/dshp-inx-custom-ui/state', { cache: 'no-store' })
         return response.json()
+      }
+      let cachedTokens = null
+      const themes = async () => {
+        if (cachedTokens) return cachedTokens
+        const response = await fetch('/ext/dshp-inx-custom-ui/themes', { cache: 'no-store' })
+        const reply = await response.json()
+        if (!reply || reply.ok !== true || !Array.isArray(reply.themes)) {
+          throw new Error((reply && reply.error) || '主题目录下发失败')
+        }
+        const map = {}
+        for (const th of reply.themes) {
+          if (th && typeof th.id === 'string' && th.tokens && typeof th.tokens === 'object') map[th.id] = th.tokens
+        }
+        cachedTokens = map
+        return map
       }
       const saveTheme = async (themeId) => {
         const response = await fetch('/ext/dshp-inx-custom-ui/theme', {
@@ -407,7 +476,7 @@ window.__ModuleLoader__.load({
         })
         return response.json()
       }
-      return { state, saveTheme, saveConfig }
+      return { state, themes, saveTheme, saveConfig }
     }
 
     /* ── 画廊组件：theme/change 驱动实时高亮 ── */
@@ -416,6 +485,8 @@ window.__ModuleLoader__.load({
         const [revision, setRevision] = React.useState(-1)
         const [notice, setNotice] = React.useState(null)
         const [radiusCfg, setRadiusCfg] = React.useState(desiredRadius)
+        const [query, setQuery] = React.useState('')
+        const [schemeFilter, setSchemeFilter] = React.useState('all')
         React.useEffect(function () {
           return ctx.on('theme/change', function (snap) {
             setRevision(snap && typeof snap.revision === 'number' ? snap.revision : 0)
@@ -430,7 +501,7 @@ window.__ModuleLoader__.load({
           : (snap ? snap.preference : current)
         const label = {}
         for (const t of THEMES) label[t.id] = t.label
-        label[PHOTO_ID] = '我的取色主题'
+        label[PHOTO_ID] = '壁纸取色'
         label.light = BUILTIN_LABELS.light
         label.dark = BUILTIN_LABELS.dark
         /* 新架构下「当前态」显示：官方 scheme（resolved）+ 是否有自定义层（desiredId） */
@@ -462,48 +533,78 @@ window.__ModuleLoader__.load({
           })
         }
 
-        /* 卡片渲染：色块（渐变）+ 名字 + 描述，纵向排列 */
-        const mkCard = (t, active, onPick) => {
+        /* ── 截图式卡片：顶部三色拼接 + 右上编号 + 标签/标题/描述 + 底部胶囊按钮 + Live 态 ──
+         * 颜色只走 meta.swatch（= lib 目录元数据），token 按需问 Host 要，不进 bundle。 */
+        function accentOf(t) {
+          if (t && typeof t.accent === 'string' && t.accent) return t.accent
+          if (t && Array.isArray(t.swatch) && typeof t.swatch[2] === 'string') return t.swatch[2]
+          return '#2f81f7'
+        }
+        function mosaicOf(t) {
+          if (t && t.id === PHOTO_ID && photoTheme) {
+            const pal = photoTheme.palettes
+            return [pal.secondary[60], photoTheme.seed, pal.tertiary[60]]
+          }
+          const sw = (t && Array.isArray(t.swatch)) ? t.swatch : []
+          return [
+            sw[0] || '#222222',
+            sw[1] || '#444444',
+            accentOf(t)
+          ]
+        }
+        const mkCard = (t, active, onPick, idx) => {
+          const accent = accentOf(t)
+          const mosaic = mosaicOf(t)
+          const schemeLabel = t.colorScheme === 'dark' ? '深色' : '浅色'
+          const tagText = t.tag || (schemeLabel + ' · ' + accent)
           return React.createElement('button', {
             key: t.id,
+            type: 'button',
             className: active ? 'tg-card tg-active' : 'tg-card',
+            'aria-pressed': active,
+            style: active ? { borderColor: accent, boxShadow: '0 0 0 1px ' + accent } : null,
             onClick: onPick
           },
-            React.createElement('span', { className: 'tg-swatch', style: { background: t.gradient || 'linear-gradient(135deg,#666,#888)' } }),
-            React.createElement('span', { className: 'tg-nameRow' },
-              React.createElement('span', { className: 'tg-name' }, t.label),
-              active ? React.createElement('span', { className: 'tg-badge' }, '使用中') : null),
-            React.createElement('span', { className: 'tg-desc' }, t.desc))
+            React.createElement('span', { className: 'tg-mosaic', 'aria-hidden': true },
+              React.createElement('i', { className: 'tg-mA', style: { background: mosaic[0] } }),
+              React.createElement('i', { className: 'tg-mB', style: { background: mosaic[1] } }),
+              React.createElement('i', { className: 'tg-mC', style: { background: accent } }),
+              React.createElement('span', { className: 'tg-idx' }, idx || '')),
+            React.createElement('span', { className: 'tg-body' },
+              React.createElement('span', { className: 'tg-tag', style: { color: accent }, title: tagText }, tagText),
+              React.createElement('span', { className: 'tg-title' }, t.label),
+              React.createElement('span', { className: 'tg-desc', title: t.desc }, t.desc),
+              React.createElement('span', { className: 'tg-foot' },
+                React.createElement('span', { className: 'tg-use', style: { background: accent } }, active ? '使用中' : '启用'),
+                React.createElement('span', { className: 'tg-live', style: { color: accent, opacity: active ? 1 : 0.72 } },
+                  React.createElement('i', null),
+                  active ? 'Live' : schemeLabel),
+                active ? React.createElement('span', { className: 'tg-check', style: { color: accent } }, '✓') : null)))
         }
 
-        const groupSections = []
-        for (const g of GROUPS) {
-          const cards = THEMES.filter((t) => t.group === g.name).map((t) =>
-            mkCard(t, desiredId === t.id, () => pick(t)))
-          groupSections.push(React.createElement('div', { key: g.name, className: 'tg-group' },
-            React.createElement('div', { className: 'tg-groupTitle' },
-              React.createElement('span', { className: 'tg-groupName' }, g.name),
-              React.createElement('span', { className: 'tg-groupSub' }, g.sub)),
-            React.createElement('div', { className: 'tg-grid' }, cards)))
-        }
+        /* 无分组：全部主题（含取色）直接平铺，grid 自适应 */
+        const ALL_THEMES = THEMES.map(function (t, i) {
+          return { data: t, idx: String(i + 1).padStart(3, '0') }
+        })
 
-        /* 我的取色（QQ「自选颜色」）：上传图片 → 提取主色 → 渐变主题 */
+        /* 壁纸取色（Material You 独立配置）：上传壁纸 → 提取 seed → MD3 整套配色 */
         const [photoBusy, setPhotoBusy] = React.useState(false)
         const pickPhoto = function (file) {
           if (!file) return
           setPhotoBusy(true)
           paletteFromFile(file).then(function (palette) {
-            photoTheme = { palette, dark: buildPhotoTokens(palette, 'dark'), light: buildPhotoTokens(palette, 'light') }
+            const seed = palette.accent
+            photoTheme = buildWallpaperTheme(seed)
             desiredId = PHOTO_ID
             applyChoice(PHOTO_ID)
-            /* palette 持久化到 settings（Host 端存色值，不存图） */
-            bridge.saveConfig({ photoPalette: palette }).then(function (reply) {
+            const pal = photoTheme.palettes
+            /* 持久化（Host 字段不变做兼容：accent 即 seed） */
+            bridge.saveConfig({ photoPalette: { accent: seed, companionA: pal.tertiary[60], companionB: pal.secondary[60] } }).then(function (reply) {
               setPhotoBusy(false)
               setNotice(reply && reply.ok
-                ? { err: null, ok: '取色主题已生成（' + palette.accent + '）并保存；亮/暗切换请用「外观」行' }
-                : { err: '主题已生效但保存失败（重启后会丢失取色）' })
-            }).catch(function () { setPhotoBusy(false); setNotice({ err: '主题已生效但保存失败' }) })
-            /* saveTheme 存 id；photo 的 token 从 palette 重建（palette 持久化即可重建 token） */
+                ? { err: null, ok: '壁纸 MD3 配色已生成（seed ' + seed + '）并保存；亮/暗跟随「外观」行' }
+                : { err: '配色已生效但保存失败（重启后会丢失取色）' })
+            }).catch(function () { setPhotoBusy(false); setNotice({ err: '配色已生效但保存失败' }) })
             bridge.saveTheme(PHOTO_ID).catch(function () {})
           }).catch(function (e) {
             setPhotoBusy(false)
@@ -511,27 +612,36 @@ window.__ModuleLoader__.load({
           })
         }
         const photoActive = desiredId === PHOTO_ID
-        const photoSection = React.createElement('div', { key: 'photo', className: 'tg-group' },
-          React.createElement('div', { className: 'tg-groupTitle' },
-            React.createElement('span', { className: 'tg-groupName' }, '我的取色'),
-            React.createElement('span', { className: 'tg-groupSub' }, '上传一张图片，提取主色生成专属渐变主题')),
-          React.createElement('div', { className: 'tg-grid' },
-            photoTheme || photoActive
-              ? mkCard(
-                { id: PHOTO_ID, label: photoTheme ? '主色 ' + photoTheme.palette.accent : '我的取色主题', desc: '图片提取的专属配色', gradient: photoTheme ? 'linear-gradient(135deg,' + photoTheme.palette.companionB + ',' + photoTheme.palette.accent + ' 55%,' + photoTheme.palette.companionA + ')' : 'linear-gradient(135deg,#f472b6,#38bdf8)' },
-                photoActive,
-                function () { desiredId = PHOTO_ID; applyChoice(PHOTO_ID); bridge.saveTheme(PHOTO_ID).catch(function () {}) })
-              : null,
-            React.createElement('label', { key: 'photo-upload', className: 'tg-card', style: { cursor: 'pointer' } },
-              React.createElement('span', { className: 'tg-swatch tg-photoSwatch' }),
-              React.createElement('span', { className: 'tg-nameRow' },
-                React.createElement('span', { className: 'tg-name' }, photoBusy ? '取色中…' : '上传图片取色')),
-              React.createElement('span', { className: 'tg-desc' }, 'png/jpg/webp，本地采样不上传'),
-              React.createElement('input', {
-                type: 'file', accept: '.png,.jpg,.jpeg,.webp',
-                style: { display: 'none' }, disabled: photoBusy,
-                onChange: function (e) { pickPhoto(e.target.files && e.target.files[0]); e.target.value = '' }
-              }))))
+        const enableWallpaper = function () {
+          if (!photoTheme) { setNotice({ err: '还没有壁纸配色，先上传一张壁纸取色' }); return }
+          desiredId = PHOTO_ID
+          applyChoice(PHOTO_ID)
+          bridge.saveTheme(PHOTO_ID).then(function (reply) {
+            setNotice(reply && reply.ok ? null : { err: (reply && reply.error) || '启用失败' })
+          }).catch(function (e) {
+            setNotice({ err: '启用失败：' + String((e && e.message) || e) })
+          })
+        }
+        const clearWallpaper = function () {
+          photoTheme = null
+          if (desiredId === PHOTO_ID) { desiredId = ''; applyChoice('') }
+          bridge.saveTheme('').catch(function () {})
+          bridge.saveConfig({ photoPalette: null }).then(function (reply) {
+            setNotice(reply && reply.ok
+              ? { err: null, ok: '壁纸配色已清除，回到官方默认' }
+              : { err: (reply && reply.error) || '清除失败' })
+          }).catch(function (e) {
+            setNotice({ err: '清除失败：' + String((e && e.message) || e) })
+          })
+        }
+        const copyM3 = function () {
+          if (!photoTheme) { setNotice({ err: '还没有壁纸配色，先上传一张壁纸取色' }); return }
+          copyText(buildM3ExportCss(photoTheme.seed)).then(function () {
+            setNotice({ err: null, ok: 'MD3 令牌已复制（--md-ref-palette-* ×156 + --md-sys-color-*-light/dark ×74）' })
+          }, function (e) {
+            setNotice({ err: '复制失败：' + String((e && e.message) || e) })
+          })
+        }
 
         /* 全局圆角三档：保存即生效。同时写模块级 desiredRadius——
          * theme/change 触发 setRevision 时若组件树因 key 重建，state 也不丢。 */
@@ -543,32 +653,149 @@ window.__ModuleLoader__.load({
           }).catch(function () { /* 保存失败静默：下次刷新回读 */ })
         }
         const rdNow = typeof radiusCfg === 'number' ? radiusCfg : -1
-        const radiusButtons = [['-1', '默认（跟随主题）'], ['0', '全锐角'], ['12', '圆润（12px）']].map(function (opt) {
+        const radiusButtons = [['-1', '默认'], ['0', '锐角'], ['12', '圆润']].map(function (opt) {
           const value = Number(opt[0])
           const active = rdNow === value
           return React.createElement('button', {
             key: opt[0],
-            className: active ? 'tg-card tg-active tg-radiusBtn' : 'tg-card tg-radiusBtn',
+            type: 'button',
+            className: active ? 'tg-radiusBtn tg-active' : 'tg-radiusBtn',
+            'aria-pressed': active,
+            title: opt[0] === '-1' ? '跟随主题' : opt[0] === '0' ? '全锐角' : '统一 12px 圆润',
             onClick: function () { pickRadius(value) }
           }, opt[1])
         })
 
+        /* 顶部简单配置区：圆角 + 回到官方（取色已独立成区，当前主题下沉到列表头 now 条） */
+        const topbar = React.createElement('div', { className: 'tg-topbar' },
+          React.createElement('div', { className: 'tg-ctl' },
+            React.createElement('span', { className: 'tg-ctlLabel' }, '圆角'),
+            React.createElement('div', { className: 'tg-radiusBtns' }, radiusButtons),
+            React.createElement('span', { className: 'tg-ctlSep' }),
+            React.createElement('button', { type: 'button', className: 'tg-release', onClick: release }, '回到官方'),
+            React.createElement('span', { className: 'tg-head' }, '点击卡片切换，自动保存')),
+          notice && notice.err ? React.createElement('p', { className: 'tg-head tg-headErr' }, notice.err) : null,
+          notice && notice.ok ? React.createElement('p', { className: 'tg-head tg-headOk' }, notice.ok) : null)
+
+        /* 壁纸取色独立配置区（MD3 整套配色，不占用主题卡片位） */
+        const wallSeed = photoTheme ? photoTheme.seed : null
+        const wallAccent = photoTheme
+          ? (resolved === 'dark' ? photoTheme.palettes.primary[80] : photoTheme.palettes.primary[40])
+          : '#2f81f7'
+        const wallToneRows = photoTheme ? ['primary', 'secondary', 'tertiary', 'neutral', 'neutralVariant'].map(function (name) {
+          const cells = M3_PREVIEW_TONES.map(function (t) {
+            const hex = photoTheme.palettes[name][t]
+            return React.createElement('i', { key: t, style: { background: hex }, title: name + t + ' ' + hex })
+          })
+          return React.createElement('div', { key: name, className: 'tg-toneRow' },
+            React.createElement('span', { className: 'tg-toneName' }, name === 'neutralVariant' ? 'neutral-variant' : name),
+            React.createElement('span', { className: 'tg-toneCells' }, cells))
+        }) : null
+        const wallRoleRows = photoTheme ? ['light', 'dark'].map(function (sk) {
+          const roles = buildM3Scheme(photoTheme.palettes, sk)
+          const keys = ['primary', 'onPrimary', 'primaryContainer', 'onPrimaryContainer', 'secondary', 'secondaryContainer', 'tertiary', 'tertiaryContainer', 'surface', 'surfaceContainer', 'surfaceContainerHighest', 'onSurface', 'outline', 'error', 'errorContainer']
+          const chips = keys.map(function (k) {
+            return React.createElement('span', { key: k, className: 'tg-chip', title: '--md-sys-color-' + k + '-' + sk + ' ' + roles[k] },
+              React.createElement('i', { style: { background: roles[k] } }), k)
+          })
+          return React.createElement('div', { key: sk, className: 'tg-roleRow' },
+            React.createElement('span', { className: 'tg-toneName' }, sk === 'light' ? '浅色' : '深色'),
+            React.createElement('span', { className: 'tg-chips' }, chips))
+        }) : null
+        const wallSection = React.createElement('div', { className: 'tg-wall' },
+          React.createElement('div', { className: 'tg-wallHead' },
+            React.createElement('span', { className: 'tg-wallTitle' }, '壁纸取色 · Material You'),
+            wallSeed ? React.createElement('span', { className: 'tg-seedChip', title: 'seed ' + wallSeed },
+              React.createElement('i', { style: { background: wallSeed } }), wallSeed) : null,
+            photoActive ? React.createElement('span', { className: 'tg-live', style: { color: wallAccent } },
+              React.createElement('i', null), 'Live') : null,
+            React.createElement('span', { className: 'tg-wallActions' },
+              React.createElement('label', { className: 'tg-radiusBtn', style: { cursor: photoBusy ? 'wait' : 'pointer', opacity: photoBusy ? 0.6 : 1 } },
+                photoBusy ? '取色中…' : '上传壁纸',
+                React.createElement('input', {
+                  type: 'file', accept: '.png,.jpg,.jpeg,.webp',
+                  style: { display: 'none' }, disabled: photoBusy,
+                  onChange: function (e) { pickPhoto(e.target.files && e.target.files[0]); e.target.value = '' }
+                })),
+              photoTheme && !photoActive ? React.createElement('button', { type: 'button', className: 'tg-radiusBtn', onClick: enableWallpaper }, '启用配色') : null,
+              photoTheme ? React.createElement('button', { type: 'button', className: 'tg-radiusBtn', onClick: copyM3, title: '复制 MD3 令牌（ref 调色板 + 亮/暗 sys 色彩）' }, '复制 MD3') : null,
+              photoTheme ? React.createElement('button', { type: 'button', className: 'tg-release', onClick: clearWallpaper }, '清除') : null)),
+          photoTheme
+            ? React.createElement('div', { className: 'tg-wallBody' }, wallToneRows,
+              React.createElement('div', { className: 'tg-roles' }, wallRoleRows))
+            : React.createElement('span', { className: 'tg-head' }, '上传一张壁纸，生成整套 MD3 动态配色（5 组 ref 调色板 × 亮/暗 scheme）；本地采样不上传。'))
+
+        /* 当前正在使用的主题（列表头） */
+        const nowTheme = (function () {
+          if (desiredId === PHOTO_ID) {
+            return photoTheme
+              ? { id: PHOTO_ID, label: '壁纸取色', desc: 'seed ' + photoTheme.seed + ' · MD3 动态配色', colorScheme: 'dark', accent: photoTheme.seed }
+              : { id: PHOTO_ID, label: '壁纸取色', desc: '取色数据缺失，请重新上传壁纸', colorScheme: 'dark', accent: '#2f81f7' }
+          }
+          for (const t of THEMES) if (t.id === desiredId) return t
+          return null
+        })()
+        const nowMosaic = nowTheme ? mosaicOf(nowTheme) : ['var(--dsw-alias-bg-layer-1)', 'var(--dsw-alias-bg-layer-2)', 'var(--dsw-alias-brand-primary)']
+        const nowAccent = nowTheme ? accentOf(nowTheme) : '#2f81f7'
+        const nowStrip = React.createElement('div', { className: 'tg-now' },
+          React.createElement('span', { className: 'tg-nowMosaic', 'aria-hidden': true },
+            React.createElement('i', { className: 'tg-mA', style: { background: nowMosaic[0] } }),
+            React.createElement('i', { className: 'tg-mB', style: { background: nowMosaic[1] } }),
+            React.createElement('i', { className: 'tg-mC', style: { background: nowAccent } })),
+          React.createElement('span', { className: 'tg-nowMeta' },
+            React.createElement('span', { className: 'tg-nowTitle' }, '正在使用：' + currentLabel),
+            React.createElement('span', { className: 'tg-nowSub' }, nowTheme ? (nowTheme.desc + ' · ' + nowAccent) : '官方默认配色 · 跟随「外观」亮/暗')),
+          React.createElement('span', { className: 'tg-nowDots', 'aria-hidden': true },
+            React.createElement('i', { style: { background: nowMosaic[0] } }),
+            React.createElement('i', { style: { background: nowMosaic[1] } }),
+            React.createElement('i', { style: { background: nowAccent } })))
+
+        /* 关键词搜索 + 亮/暗过滤 */
+        const q = query.trim().toLowerCase()
+        const matchEntry = function (entry) {
+          const t = entry.data
+          if (schemeFilter !== 'all' && t.colorScheme !== schemeFilter) return false
+          if (!q) return true
+          const hay = (t.label + ' ' + t.desc + ' ' + t.id + ' ' + accentOf(t)).toLowerCase()
+          return hay.indexOf(q) !== -1
+        }
+        const schemePills = [['all', '全部'], ['dark', '深色'], ['light', '浅色']].map(function (opt) {
+          const active = schemeFilter === opt[0]
+          return React.createElement('button', {
+            key: opt[0],
+            type: 'button',
+            className: active ? 'tg-radiusBtn tg-active' : 'tg-radiusBtn',
+            'aria-pressed': active,
+            onClick: function () { setSchemeFilter(opt[0]) }
+          }, opt[1])
+        })
+        const visibleEntries = ALL_THEMES.filter(matchEntry)
+        const toolbar = React.createElement('div', { className: 'tg-toolbar' },
+          React.createElement('input', {
+            className: 'tg-search',
+            type: 'search',
+            placeholder: '搜索主题…',
+            value: query,
+            onChange: function (e) { setQuery(e.target.value) }
+          }),
+          React.createElement('div', { className: 'tg-radiusBtns' }, schemePills),
+          React.createElement('span', { className: 'tg-count' }, visibleEntries.length + ' / ' + ALL_THEMES.length))
+        const cards = visibleEntries.map(function (entry) {
+          const t = entry.data
+          const onPick = entry.onPick || (function () { const tt = t; return function () { pick(tt) } })()
+          return mkCard(t, desiredId === t.id, onPick, entry.idx)
+        })
+
+        /* 简单配置在前，壁纸取色居中，主题色列表（最后一项）在后 */
         return React.createElement('div', { className: 'tg-page' },
-          React.createElement('p', { className: 'tg-head' }, '当前主题：' + currentLabel + '（点击卡片切换，选择自动保存）'),
-          notice && notice.err ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-error-primary)' } }, notice.err) : null,
-          notice && notice.ok ? React.createElement('p', { className: 'tg-head', style: { color: 'var(--dsw-alias-state-success-primary)' } }, notice.ok) : null,
-          groupSections,
-          photoSection,
-          React.createElement('p', { className: 'tg-head' },
-            '不用调色盘了？',
-            ' ',
-            React.createElement('button', {
-              className: 'tg-release',
-              onClick: release
-            }, '回到官方默认配色（亮/暗请用「外观」行切换）')),
-          React.createElement('div', { className: 'tg-radiusRow' },
-            React.createElement('span', { className: 'tg-radiusLabel' }, '全局圆角'),
-            React.createElement('div', { className: 'tg-radiusBtns' }, radiusButtons))
+          topbar,
+          wallSection,
+          React.createElement('div', { className: 'tg-list' },
+            nowStrip,
+            toolbar,
+            cards.length > 0
+              ? React.createElement('div', { className: 'tg-grid' }, cards)
+              : React.createElement('span', { className: 'tg-head' }, '无匹配主题，换个关键词或切换亮/暗过滤试试。'))
         )
       }
     }
@@ -604,16 +831,19 @@ window.__ModuleLoader__.load({
       let overrideDispose = null
 
       function findTheme(id) {
-        if (id === PHOTO_ID && photoTheme) {
-          return { id: PHOTO_ID, colorScheme: 'dark', tokens: photoTheme.dark, label: '我的取色主题', desc: '从图片提取的专属配色' }
+        if (id === PHOTO_ID) {
+          return photoTheme
+            ? { id: PHOTO_ID, colorScheme: 'dark', label: '壁纸取色', desc: 'seed ' + photoTheme.seed + ' · MD3 动态配色' }
+            : null
         }
         for (const t of THEMES) if (t.id === id) return t
         return null
       }
 
       /** 把一套主题 token（单 scheme）展开成官方覆盖层 pair。
-       *  photo 主题双 scheme 都有值（亮暗双套）；静态主题对侧回官方原值。 */
-      function buildPair(t) {
+       *  photo 主题双 scheme 都有值（亮暗双套）；静态主题 token 问 Host 要，
+       *  对侧回官方原值。 */
+      function buildPair(t, tokens) {
         const pair = {}
         if (t.id === PHOTO_ID && photoTheme) {
           for (const [name, value] of Object.entries(photoTheme.dark)) {
@@ -622,7 +852,7 @@ window.__ModuleLoader__.load({
           return pair
         }
         const officialSide = t.colorScheme === 'dark' ? OFFICIAL_LIGHT : OFFICIAL_DARK
-        for (const [name, value] of Object.entries(t.tokens)) {
+        for (const [name, value] of Object.entries(tokens)) {
           pair[name] = t.colorScheme === 'dark'
             ? { light: name in officialSide ? officialSide[name] : value, dark: value }
             : { dark: name in officialSide ? officialSide[name] : value, light: value }
@@ -648,34 +878,61 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
       }
 
-      /** 应用主题覆盖层 + 官方偏好切到主题 scheme。空 id = 撤销覆盖（回官方）。 */
+      /** 应用主题覆盖层 + 官方偏好切到主题 scheme。空 id = 撤销覆盖（回官方）。
+       *  静态主题 token 问 Host 要（/themes，一次缓存）；photo 本地即有。
+       *  异步到达时若用户已改选（desiredId 变化）则丢弃，避免后到覆盖先到。 */
       function applyThemeChoice(themeId) {
         try {
           if (overrideDispose) { overrideDispose(); overrideDispose = null }
-          const t = themeId ? findTheme(themeId) : null
-          if (t) {
-            overrideDispose = theme.overrideTokens(OVERRIDE_SOURCE, buildPair(t))
+          if (!themeId) { renderBodyGradient(); return }
+          if (themeId === PHOTO_ID) {
+            if (!photoTheme) { renderBodyGradient(); return }
+            overrideDispose = theme.overrideTokens(OVERRIDE_SOURCE, buildPair({ id: PHOTO_ID }))
             const pref = theme.getTheme().preference
-            const scheme = t.id === PHOTO_ID
-              ? (pref === 'light' ? 'light' : 'dark') /* photo 双套跟随当前偏好方向 */
-              : t.colorScheme
-            if (pref !== scheme) theme.setTheme(scheme)
+            if (pref !== 'light' && pref !== 'dark') { /* system 交给覆盖层自动跟随 */ }
+            renderBodyGradient()
+            return
           }
-          renderBodyGradient()
+          const t = findTheme(themeId)
+          if (!t) {
+            console.warn('[dshp-inx-custom-ui] 未知主题 id，已回官方: ' + themeId)
+            desiredId = ''
+            renderBodyGradient()
+            return
+          }
+          bridge.themes().then(function (map) {
+            if (desiredId !== themeId) return /* 已改选，丢弃 */
+            const tokens = map[themeId]
+            if (!tokens) {
+              console.error('[dshp-inx-custom-ui] 主题下发缺失: ' + themeId)
+              return
+            }
+            try {
+              if (overrideDispose) { overrideDispose(); overrideDispose = null }
+              overrideDispose = theme.overrideTokens(OVERRIDE_SOURCE, buildPair(t, tokens))
+              const pref = theme.getTheme().preference
+              if (pref !== t.colorScheme) theme.setTheme(t.colorScheme)
+            } catch (e) {
+              console.error('[dshp-inx-custom-ui] 主题覆盖失败: ' + String(e && e.message))
+            }
+            renderBodyGradient()
+          }).catch(function (e) {
+            console.error('[dshp-inx-custom-ui] 主题 token 下发失败: ' + String((e && e.message) || e))
+          })
         } catch (e) {
           console.error('[dshp-inx-custom-ui] 主题覆盖失败: ' + String(e && e.message))
         }
       }
 
-      /* 启动恢复：读 settings 持久化的 themeId 重建覆盖层；photo 主题从持久化
-       * palette 重建 token；同时恢复全局圆角。 */
+      /* 启动恢复：读 settings 持久化的 themeId 重建覆盖层；壁纸 MD3 从持久化
+       * seed（= photoPalette.accent，兼容旧数据）重建 token；同时恢复全局圆角。 */
       const bridge = createBridge()
       bridge.state().then(function (reply) {
         if (reply && reply.ok === true) {
           const saved = typeof reply.themeId === 'string' ? reply.themeId : ''
           const pal = reply.photoPalette
           if (pal && typeof pal.accent === 'string') {
-            photoTheme = { palette: pal, dark: buildPhotoTokens(pal, 'dark'), light: buildPhotoTokens(pal, 'light') }
+            photoTheme = buildWallpaperTheme(pal.seed || pal.accent)
           }
           desiredId = saved
           if (saved.length > 0) applyThemeChoice(saved)

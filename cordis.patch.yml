@@ -1,5 +1,6 @@
 # @dshp-inx/custom-ui bundle patch: theme gallery for DeepSeek Harness.
-# Registers 8 open-design themes and a settings page for one-click switching.
+# Registers the lib/themes catalog (23 themes, see lib/themes/index.js THEME_CATALOG)
+# plus runtime wallpaper recolor (photo:custom) and a settings page for one-click switching.
 
 - insert:
     - id: dshp-inx-custom-ui
