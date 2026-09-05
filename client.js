@@ -1164,22 +1164,22 @@ window.__ModuleLoader__.load({
 
     /* ── 背景管线：壁纸层 + 容器透明化/磨砂覆盖层 ──
      * 社区通行方案（BetterDiscord Translucence 的 --app-bg + layers 磨砂、
-     * Obsidian workspace background snippet 的容器降透明）在 DSH 的落地。
+     * Obsidian workspace background snippet 的容器降透明）在 DSH 的落地：
      *
-     * 遮挡链（必须逐层透明化，只动列容器不够）：三列容器（.pI_x6G_*Col）
-     * 透明后，列内的**内容根**仍各自画不透明主题背景把壁纸挡死——
-     *   中列  会话根（wSkVaW_root，background:--dsw-alias-bg-base）
-     *   侧栏  侧栏根（hHd-Xa_root，background:--dsw-specific-sidebar-fill）
-     *   详情  chat 根（_2ctAZa_root，background:--dsw-alias-bg-base）
-     * 覆盖层因此对内容根逐一替换为 color-mix 半透明值；磨砂统一收在
-     * 列 ::before 伪元素上——伪元素不构成 fixed 后代的包含块，backdrop-
-     * filter 放列自身会把设置 dialog（VOzbGW_overlay fixed）的定位基准
-     * 从视口压成侧栏列（历史翻车 a3fd708）。
+     * 分层（z-index 升序）：
+     *   body 背景   → 主题 --dsw-alias-bg-base（官方 body 规则持有，不动）
+     *   #bg-layer   → fixed 全屏壁纸（图/视频，blur/dim 滤镜吃在层上）
+     *   #root       → 三列 frame（grid，原位）—— 官方 frame 背景
+     *                 --dsw-alias-bg-base 改为半透明，壁纸透出
+     *   各列        → ::before 磨砂伪元素（glass>0 时 backdrop-filter），
+     *                 绝不能把 backdrop-filter 放在列自身 —— 列内 fixed
+     *                 浮层（设置 dialog .VOzbGW_overlay）会以列为包含块
+     *                 被压塌（历史翻车 a3fd708）。
      *
-     * 选择器双通道：语义属性（[class*="_sidebarCol"] 等，升级漂移后仍命中）
-     * + 当前版本 hash 类名（点杀必然生效）。列内更深的卡片/气泡/输入框
-     * 保持主题 token 不动（可读性优先）；官方弹层（VOzbGW / 菜单 overlay）
-     * 不在覆盖面，保持不透明浮最上。 */
+     * 伪元素不构成 fixed 后代的包含块，磨砂安全；同时列自身 background
+     * 保持 transparent（原 token 交给 ::before 上色），实现社区主题同款
+     * 「背景图 + 磨砂浮层」观感。设置面板/菜单（--dsw-specific-menu/
+     * bg-overlay）不透明，浮在最上不受影响。 */
     const BG_LAYER_ID = 'dshp-inx-custom-ui-bg-layer'
     const BG_CSS_ID = 'dshp-inx-custom-ui-bg-css'
     const DEFAULT_BG = { type: 'none', file: '', blur: 0, dim: 0, glass: 0, containerAlpha: 84, centerAlpha: 92 }
@@ -1229,33 +1229,27 @@ window.__ModuleLoader__.load({
       }
       document.body.prepend(layer)
 
-      /* 覆盖层样式。alpha 分档：容器档（侧栏/详情）与内容档（中列）。
-       * color-mix 第二分量是百分比（62%），传小数会让整条声明非法（历史坑）。 */
+      /* 覆盖层样式：frame 半透明 + 各列伪元素磨砂。
+       * color-mix 第二分量是百分比（62%），传小数会让整条声明非法（历史坑）。
+       * frame 是 #root 直下 grid 容器（.pI_x6G_frame）；选择器不强绑 hash，
+       * 用 [class*="_frame"] 语义命中，漂移风险低。 */
       const mix = (token, pct) => 'color-mix(in srgb, ' + token + ' ' + pct + '%, transparent)'
       const glassCss = glassPx > 0 ? 'backdrop-filter:blur(' + glassPx + 'px) saturate(1.15);-webkit-backdrop-filter:blur(' + glassPx + 'px) saturate(1.15);' : ''
       const css = [
         'body{background:var(--dsw-alias-bg-base) !important}',
-        /* frame：grid 壳按内容档半透明（hash .pI_x6G_frame + 语义双通道） */
-        '#root>[class*="_frame"],#root>.pI_x6G_frame{background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + ' !important}',
-        /* ── 侧栏列：容器 transparent + 磨砂伪元素（容器档）── */
-        '#root [class*="_sidebarCol"],#root .pI_x6G_sidebarCol{position:relative;background:transparent !important}',
-        '#root [class*="_sidebarCol"]::before,#root .pI_x6G_sidebarCol::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
+        '#root>[class*="_frame"]{background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + ' !important}',
+        /* 侧栏列（.pI_x6G_sidebarCol）：sidebar-fill 半透明 + 磨砂伪元素 */
+        '#root [class*="_sidebarCol"]{position:relative;background:transparent !important}',
+        '#root [class*="_sidebarCol"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
           + glassCss + 'background:' + mix('var(--dsw-specific-sidebar-fill)', containerAlpha) + '}',
-        /* 侧栏内容根（hHd-Xa_root）挡壁纸 → 容器档替换（token 值才换，别碰子卡片） */
-        '#root [class*="_sidebarCol"]>[class*="_root"],#root .pI_x6G_sidebarCol>.hHd-Xa_root{background:' + mix('var(--dsw-specific-sidebar-fill)', containerAlpha) + ' !important}',
-        /* ── 详情列：容器 transparent + 磨砂伪元素（容器档）── */
-        '#root [class*="_detailsCol"],#root .pI_x6G_detailsCol{position:relative;background:transparent !important}',
-        '#root [class*="_detailsCol"]::before,#root .pI_x6G_detailsCol::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
+        /* 详情列（.pI_x6G_detailsCol）：bg-layer-1 半透明 + 磨砂 */
+        '#root [class*="_detailsCol"]{position:relative;background:transparent !important}',
+        '#root [class*="_detailsCol"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
           + glassCss + 'background:' + mix('var(--dsw-alias-bg-layer-1)', containerAlpha) + '}',
-        /* chat 根（_2ctAZa_root，bg-base）挡壁纸 → 容器档替换 */
-        '#root [class*="_detailsCol"] [class*="_root"],#root .pI_x6G_detailsCol ._2ctAZa_root{background:' + mix('var(--dsw-alias-bg-base)', containerAlpha) + ' !important}',
-        /* ── 中列：容器 transparent + 内容根（wSkVaW_root）内容档替换 ── */
-        '#root [class*="_centerCol"],#root .pI_x6G_centerCol{position:relative;background:transparent !important}',
-        '#root [class*="_centerCol"]::before,#root .pI_x6G_centerCol::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
-          + 'background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + '}',
-        '#root [class*="_centerCol"]>[class*="_root"],#root .pI_x6G_centerCol>.wSkVaW_root{background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + ' !important}',
-        /* 输入区 sticky 底衬（wSkVaW_composerSeat 的 bg-base 渐变）同内容档透 */
-        '#root [class*="_centerCol"] [class*="_composerSeat"],#root .pI_x6G_centerCol .wSkVaW_composerSeat{background:linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px, ' + mix('var(--dsw-alias-bg-base)', centerAlpha) + ' 36px) !important}'
+        /* 中列（.pI_x6G_centerCol）：本身无背景 token，给浅覆盖保气泡可读 */
+        '#root [class*="_centerCol"]{position:relative}',
+        '#root [class*="_centerCol"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
+          + 'background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + '}'
       ]
       const style = document.createElement('style')
       style.id = BG_CSS_ID

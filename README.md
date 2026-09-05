@@ -102,15 +102,12 @@ ln -s "$HOME/.dsh/plugins/dsh-custom-ui" node_modules/@dshp-inx/custom-ui
   `~/.dsh/custom-ui/wallpapers/`，点文件名即设为全站背景。渲染走社区
   主题同款分层（BetterDiscord Translucence `--app-bg` + Obsidian
   workspace background 方案）：壁纸层 fixed 垫 `body` 底（吃模糊/压暗
-  滤镜），**三列容器与列内内容根**（会话根/侧栏根/chat 根——各自画
-  不透明主题背景，v1.1.0 只透明化容器、内容根把壁纸挡死；v1.1.1
-  修复）以 `color-mix` 降为半透明浮于其上，磨砂走列的 `::before`
-  伪元素 `backdrop-filter`（伪元素不构成 fixed 浮层的包含块，设置
-  弹窗定位不受影响）。可调：背景模糊 0–40px / 背景压暗 0–0.8 /
-  磨砂强度 0–24px / 列不透明度 40–100% / 内容不透明度 60–100%。
-  文件 ✕ 删除（删当前背景自动回 none），「关闭背景」一键回官方默认。
-  覆盖层选择器语义属性 + hash 双通道，`scripts/bg-coverage.mjs`
-  校验遮挡链 12 项全命中（npm test 已串联）。
+  滤镜），三列容器以 `color-mix` 降为半透明浮于其上，磨砂走列的
+  `::before` 伪元素 `backdrop-filter`（伪元素不构成 fixed 浮层的包含
+  块，设置弹窗定位不受影响）。可调：背景模糊 0–40px / 背景压暗
+  0–0.8 / 磨砂强度 0–24px / 列不透明度 40–100% / 内容不透明度
+  60–100%。文件 ✕ 删除（删当前背景自动回 none），「关闭背景」一键
+  回官方默认。
 - **壁纸取色（Material You）**：独立配置区，不占主题卡片位。上传壁纸→
   提取 seed→生成 5 组 ref 调色板 × 亮/暗 sys 色彩，色调条 + 角色预览，
   一键启用；`复制 MD3` 导出 `--md-ref-palette-*` + `--md-sys-color-*-light/dark`
