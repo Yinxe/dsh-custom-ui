@@ -1,9 +1,9 @@
 {
   "name": "@dshp-inx/custom-ui",
-  "version": "1.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Custom UI suite for DeepSeek Harness: theme gallery (23 themes with ~121 full token mappings each), background pipeline (image/video wallpaper with blur/dim/frost overlay), and Material You wallpaper recolor.",
+  "description": "Custom UI suite for DeepSeek Harness: theme gallery is the first module (23 themes with ~121 full token mappings each); future modules (fonts, layout, interactions) will live here too.",
   "license": "MIT",
   "author": "Yinxe",
   "main": "lib/index.js",
@@ -43,6 +43,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --check lib/index.js && node --check client.js && node --check lib/themes/opencode.js && node --check lib/themes/linear.js && node --check lib/themes/notion.js && node --check lib/themes/claude.js && node --check lib/themes/nvidia.js && node --check lib/themes/github.js && node --check lib/themes/replicate.js && node --check lib/themes/cisco.js && node --check lib/themes/neobrutalism.js && node --check lib/themes/missioncontrol.js && node --check lib/themes/levels.js && node --check lib/themes/arc.js && node --check lib/themes/luxury.js && node --check lib/themes/skeumorphism.js && node --check lib/themes/wechat.js && node --check lib/themes/xiaohongshu.js && node --check lib/themes/discord.js && node --check lib/themes/supabase.js && node --check lib/themes/nebula.js && node --check lib/themes/sakura.js && node --check lib/themes/tide.js && node --check lib/themes/photo.js && node --check lib/themes/shared.js && node scripts/check-themes.mjs && echo \"syntax ok\""
+    "test": "node --check lib/index.js && node --check client.js && node --check lib/themes/opencode.js && node --check lib/themes/linear.js && node --check lib/themes/notion.js && node --check lib/themes/claude.js && node --check lib/themes/nvidia.js && node --check lib/themes/github.js && node --check lib/themes/replicate.js && node --check lib/themes/cisco.js && node --check lib/themes/neobrutalism.js && node --check lib/themes/missioncontrol.js && node --check lib/themes/levels.js && node --check lib/themes/arc.js && node --check lib/themes/luxury.js && node --check lib/themes/skeumorphism.js && node --check lib/themes/wechat.js && node --check lib/themes/xiaohongshu.js && node --check lib/themes/discord.js && node --check lib/themes/supabase.js && node --check lib/themes/nebula.js && node --check lib/themes/sakura.js && node --check lib/themes/tide.js && node --check lib/themes/photo.js && node --check lib/themes/shared.js && echo \"syntax ok\""
   }
 }

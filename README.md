@@ -1,8 +1,6 @@
 # @dshp-inx/custom-ui —— DSH 定制 UI 套件
 
-两个模块：主题画廊（23 套主题，14 套品牌适配 + 9 套原创 + 壁纸 MD3 取色）与
-背景管线（图片/视频壁纸 + 模糊/压暗/磨砂，社区主题式分层渲染）。后续字体、
-布局、交互等定制模块都归入本包。
+主题画廊是第一个模块：23 套主题（14 套品牌适配 + 9 套原创）+ 设置内一键切换。后续字体、布局、交互等定制模块都归入本包。
 
 ## 主题清单（label/desc/swatch 以 `lib/themes/*/meta` 为准；token 单源 `lib/themes/`，Host 经 `GET /themes` 下发，client 只存 meta——改色只改 lib，跑 `scripts/check-themes.mjs` 校验三处一致）
 
@@ -94,30 +92,18 @@ ln -s "$HOME/.dsh/plugins/dsh-custom-ui" node_modules/@dshp-inx/custom-ui
 
 ## 使用
 
-设置 → 外观定制（四块）：
+设置 → 外观定制（两块）：
 
 - **主题画廊**：色卡预览 + 点击即切，`theme/change` 事件驱动"使用中"
   徽标实时跟随；内置浅色/深色也可在画廊顶部查看当前态并随时切回。
-- **背景壁纸**：图片（≤24MB）或视频（≤96MB）上传到本地
-  `~/.dsh/custom-ui/wallpapers/`，点文件名即设为全站背景。渲染走社区
-  主题同款分层（BetterDiscord Translucence `--app-bg` + Obsidian
-  workspace background 方案）：壁纸层 fixed 垫 `body` 底（吃模糊/压暗
-  滤镜），三列容器以 `color-mix` 降为半透明浮于其上，磨砂走列的
-  `::before` 伪元素 `backdrop-filter`（伪元素不构成 fixed 浮层的包含
-  块，设置弹窗定位不受影响）。可调：背景模糊 0–40px / 背景压暗
-  0–0.8 / 磨砂强度 0–24px / 列不透明度 40–100% / 内容不透明度
-  60–100%。文件 ✕ 删除（删当前背景自动回 none），「关闭背景」一键
-  回官方默认。
 - **壁纸取色（Material You）**：独立配置区，不占主题卡片位。上传壁纸→
   提取 seed→生成 5 组 ref 调色板 × 亮/暗 sys 色彩，色调条 + 角色预览，
   一键启用；`复制 MD3` 导出 `--md-ref-palette-*` + `--md-sys-color-*-light/dark`
  （与 MD3 令牌命名兼容，可直接用于 MD3 项目）。持久化只存 seed（兼容旧数据）。
 - **全局圆角**：三档（-1 跟随主题 / 0 全锐角 / 12 统一圆润），保存即生效，无需刷新。
-
-背景持久化字段：settings.yaml `dshp-inx-custom-ui.background`
-（`type`/`file`/`blur`/`dim`/`glass`/`containerAlpha`/`centerAlpha`），
-文件本体存 `~/.dsh/custom-ui/wallpapers/`；旧退役字段 `wallpaper.*`/`glass.*`
-仍做不透明透传保留，不再有 UI 写入。
+- ~~**背景与外观**（壁纸上传/视频/毛玻璃）~~：已退役（见 `aebe395`）。`settings.yaml`
+  里残留的 `wallpaper.*`/`glass.*` 仅做不透明透传保留数据，不再有 UI；
+  取色请用上面的壁纸取色（MD3 动态配色）。
 
 ## 持久化
 
@@ -125,19 +111,14 @@ ln -s "$HOME/.dsh/plugins/dsh-custom-ui" node_modules/@dshp-inx/custom-ui
 `light/dark/system`——自定义主题 id 只写内存，重启即丢。本插件补上持久化：
 
 - **Host 半**：注册 `dshp-inx-custom-ui` settings 命名空间
-  （settings.yaml 顶层，`themeId`/`photoPalette`/`radius`/`background` 字段；
+  （settings.yaml 顶层，`themeId`/`photoPalette`/`radius` 字段；
   退役的 `wallpaper`/`glass` 仅透传保留），同源路由
-  `GET /ext/dshp-inx-custom-ui/state`（偏好快照 + 背景文件对账）、
+  `GET /ext/dshp-inx-custom-ui/state`（偏好快照）、
   `GET /ext/dshp-inx-custom-ui/themes`（目录全量 token 下发）、
   `POST /ext/dshp-inx-custom-ui/theme`（切主题）、
-  `POST /ext/dshp-inx-custom-ui/config`（圆角/取色/背景）、
-  `GET /ext/dshp-inx-custom-ui/wallpapers`（壁纸文件列表）、
-  `POST /ext/dshp-inx-custom-ui/wallpaper`（multipart 上传）、
-  `POST /ext/dshp-inx-custom-ui/wallpaper-delete`（删除）、
-  `prefix /ext/dshp-inx-custom-ui/file/*`（壁纸静态服务，ETag 缓存）
-- **Client 半**：启动时读 state 恢复主题（注册完成后再 setTheme，静默容错）、
-  圆角与背景层；画廊点击时先 setTheme 再 POST 保存，保存失败会提示
-  （重启后回退内置偏好）；背景层每次配置变更幂等重渲染（拆旧层建新层）
+  `POST /ext/dshp-inx-custom-ui/config`（圆角/取色）
+- **Client 半**：启动时读 state 恢复主题（注册完成后再 setTheme，静默容错）；
+  画廊点击时先 setTheme 再 POST 保存，保存失败会提示（重启后回退内置偏好）
 - 清空持久化：把 settings.yaml 里 `dshp-inx-custom-ui.themeId` 置空串，
   即完全跟随官方外观偏好（system/light/dark）
 - 白名单校验：Host 半只接受目录内的 23 个主题 id（+ 虚拟 `photo:custom`），未知 id 拒写

@@ -1,6 +1,5 @@
 /* custom-ui client half — hand-authored __ModuleLoader__ bundle.
  * 「外观定制 = 调色盘」：主题网格（grid 自适应，一行默认 4 张）+
- * 背景管线（图片/视频壁纸 + 模糊/压暗/磨砂，社区主题式分层）+
  * 壁纸取色生成 Material You 整套配色（上传壁纸 → 提取 seed → MD3 调色板 +
  * 亮/暗双 scheme + body 渐变，导出兼容 MD3 令牌命名）。
  * 架构：官方亮/暗为唯一偏好（overrideTokens 覆盖层），持久化走 Host settings。
@@ -93,27 +92,6 @@ window.__ModuleLoader__.load({
 .tg-radiusBtn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
 .tg-radiusBtn.tg-active{background:var(--dsw-alias-bg-multi-select);box-shadow:inset 0 0 0 1px var(--dsw-alias-button-ghost-active-border)}
 @media (prefers-reduced-motion:reduce){.tg-card{transition:none}}
-/* ── 背景管线设置区 ── */
-.tg-bkg{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:var(--dsw-alias-bg-module-platform);border:.5px solid var(--dsw-alias-border-l2)}
-.tg-bkgHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.tg-bkgTitle{font-size:12px;font-weight:700;line-height:18px;color:var(--dsw-alias-label-primary)}
-.tg-bkgActions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.tg-bkgBody{display:flex;flex-direction:column;gap:8px}
-.tg-bkgRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.tg-bkgRowLabel{font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary);flex:none}
-.tg-bkgFiles{display:flex;gap:6px;flex-wrap:wrap}
-.tg-bkgFile{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px 0 9px;border-radius:12px;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);font-size:11px;line-height:24px;color:var(--dsw-alias-label-secondary);max-width:100%}
-.tg-bkgFile.tg-active{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 1px var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary)}
-.tg-bkgFileBtn{border:none;background:none;padding:0;font:inherit;font-size:11px;line-height:24px;color:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
-.tg-bkgFileBtn:hover{text-decoration:underline}
-.tg-bkgFileDel{border:none;background:none;padding:0;font:inherit;font-size:12px;line-height:1;color:var(--dsw-alias-label-tertiary);cursor:pointer;flex:none}
-.tg-bkgFileDel:hover{color:var(--dsw-alias-state-error-primary)}
-.tg-bkgSlider{display:flex;align-items:center;gap:8px;flex:1;min-width:200px}
-.tg-bkgRange{flex:1;min-width:0;height:4px;-webkit-appearance:none;appearance:none;border-radius:2px;background:var(--dsw-alias-interactive-bg-hover);outline:none}
-.tg-bkgRange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-brand-primary);cursor:pointer;border:none}
-.tg-bkgRange::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-brand-primary);cursor:pointer;border:none}
-.tg-bkgRange:disabled{opacity:.45;cursor:default}
-.tg-bkgVal{width:36px;flex:none;text-align:right;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 `
 
     /* ── 主题目录（meta-only；token 由 Host 经 GET /themes 下发，单源 lib/themes）──
@@ -688,147 +666,6 @@ window.__ModuleLoader__.load({
           }, opt[1])
         })
 
-        /* ── 背景管线状态：cfg 镜像 Host background；files 来自壁纸目录 ── */
-        const [bgCfg, setBgCfg] = React.useState(null)
-        const [bgFiles, setBgFiles] = React.useState([])
-        const [bgBusy, setBgBusy] = React.useState(false)
-        React.useEffect(function () {
-          bridge.state().then(function (reply) {
-            if (reply && reply.ok === true) setBgCfg(Object.assign({}, DEFAULT_BG, reply.background || {}))
-          }).catch(function () { /* 状态失败不阻塞画廊 */ })
-          fetch('/ext/dshp-inx-custom-ui/wallpapers', { cache: 'no-store' }).then(function (r) { return r.json() }).then(function (reply) {
-            if (reply && reply.ok === true && Array.isArray(reply.files)) setBgFiles(reply.files)
-          }).catch(function () { /* 列表失败不阻塞 */ })
-        }, [])
-
-        const bgSave = function (patch) {
-          if (!bgCfg) return
-          const next = Object.assign({}, bgCfg, patch)
-          setBgCfg(next)
-          applyBackground(next)
-          bridge.saveConfig({ background: next }).then(function (reply) {
-            if (reply && reply.ok === true) {
-              const merged = Object.assign({}, next, reply.background || {})
-              setBgCfg(merged)
-              applyBackground(merged)
-            } else {
-              setNotice({ err: (reply && reply.error) || '背景配置保存失败' })
-            }
-          }).catch(function (e) {
-            setNotice({ err: '背景配置保存失败：' + String((e && e.message) || e) })
-          })
-        }
-
-        const bgUpload = function (file) {
-          if (!file) return
-          setBgBusy(true)
-          setNotice(null)
-          const form = new FormData()
-          form.append('file', file, file.name)
-          fetch('/ext/dshp-inx-custom-ui/wallpaper', { method: 'POST', body: form }).then(function (r) { return r.json() }).then(function (reply) {
-            setBgBusy(false)
-            if (reply && reply.ok === true) {
-              setBgFiles(function (prev) {
-                const without = prev.filter(function (f) { return f.name !== reply.name })
-                return without.concat([{ name: reply.name, size: reply.size, type: reply.type }]).sort(function (a, b) { return a.name.localeCompare(b.name) })
-              })
-              bgSave({ type: reply.type, file: reply.name })
-              setNotice({ err: null, ok: '已上传并应用为背景：' + reply.name })
-            } else {
-              setNotice({ err: (reply && reply.error) || '上传失败' })
-            }
-          }).catch(function (e) {
-            setBgBusy(false)
-            setNotice({ err: '上传失败：' + String((e && e.message) || e) })
-          })
-        }
-
-        const bgDelete = function (name) {
-          setBgBusy(true)
-          fetch('/ext/dshp-inx-custom-ui/wallpaper-delete', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ name })
-          }).then(function (r) { return r.json() }).then(function (reply) {
-            setBgBusy(false)
-            if (reply && reply.ok === true) {
-              setBgFiles(function (prev) { return prev.filter(function (f) { return f.name !== name }) })
-              /* 若删的是当前背景：Host 已清引用，本地同步回 none */
-              if (bgCfg && bgCfg.file === name) {
-                const off = Object.assign({}, bgCfg, { type: 'none', file: '' })
-                setBgCfg(off)
-                applyBackground(off)
-              }
-            } else {
-              setNotice({ err: (reply && reply.error) || '删除失败' })
-            }
-          }).catch(function (e) {
-            setBgBusy(false)
-            setNotice({ err: '删除失败：' + String((e && e.message) || e) })
-          })
-        }
-
-        /* 背景滑杆（label / 当前值 / min / max / step / 值后缀 / onChange） */
-        const bgSlider = function (label, value, min, max, step, suffix, onInput) {
-          return React.createElement('div', { className: 'tg-bkgRow' },
-            React.createElement('span', { className: 'tg-bkgRowLabel' }, label),
-            React.createElement('span', { className: 'tg-bkgSlider' },
-              React.createElement('input', {
-                className: 'tg-bkgRange', type: 'range',
-                min: String(min), max: String(max), step: String(step),
-                value: String(value), disabled: bgBusy,
-                onChange: function (e) { onInput(Number(e.target.value)) }
-              }),
-              React.createElement('span', { className: 'tg-bkgVal' }, String(value) + suffix)))
-        }
-
-        const bgActive = bgCfg && (bgCfg.type === 'image' || bgCfg.type === 'video') && bgCfg.file
-        const bkgSection = bgCfg === null ? null : React.createElement('div', { className: 'tg-bkg' },
-          React.createElement('div', { className: 'tg-bkgHead' },
-            React.createElement('span', { className: 'tg-bkgTitle' }, '背景壁纸'),
-            bgActive ? React.createElement('span', { className: 'tg-live', style: { color: 'var(--dsw-alias-state-business-primary)' } },
-              React.createElement('i', null), bgCfg.type === 'video' ? 'Live 视频' : 'Live 图片') : null,
-            React.createElement('span', { className: 'tg-bkgActions' },
-              React.createElement('button', {
-                type: 'button', className: 'tg-radiusBtn',
-                disabled: bgBusy || !bgActive,
-                onClick: function () { bgSave({ type: 'none', file: '' }) }
-              }, '关闭背景'),
-              React.createElement('label', { className: 'tg-radiusBtn', style: { cursor: bgBusy ? 'wait' : 'pointer', opacity: bgBusy ? 0.6 : 1 } },
-                bgBusy ? '处理中…' : '上传图片/视频',
-                React.createElement('input', {
-                  type: 'file', accept: '.png,.jpg,.jpeg,.gif,.webp,.avif,.bmp,.mp4,.webm',
-                  style: { display: 'none' }, disabled: bgBusy,
-                  onChange: function (e) { bgUpload(e.target.files && e.target.files[0]); e.target.value = '' }
-                })))),
-          bgFiles.length > 0 ? React.createElement('div', { className: 'tg-bkgFiles' },
-            bgFiles.map(function (f) {
-              const active = bgActive && bgCfg.file === f.name
-              return React.createElement('span', { key: f.name, className: active ? 'tg-bkgFile tg-active' : 'tg-bkgFile', title: f.name + ' · ' + Math.round(f.size / 1024) + ' KB' },
-                f.type === 'video' ? '🎬 ' : '🖼 ',
-                React.createElement('button', {
-                  type: 'button', className: 'tg-bkgFileBtn',
-                  onClick: function () { bgSave({ type: f.type, file: f.name }) }
-                }, f.name),
-                React.createElement('button', {
-                  type: 'button', className: 'tg-bkgFileBtn', title: '文件大小',
-                  style: { cursor: 'default', maxWidth: 'none', flex: 'none' }
-                }, Math.round(f.size / 1024) + 'K'),
-                React.createElement('button', {
-                  type: 'button', className: 'tg-bkgFileDel', title: '删除文件',
-                  disabled: bgBusy,
-                  onClick: function () { bgDelete(f.name) }
-                }, '✕'))
-            })) : React.createElement('span', { className: 'tg-head' }, '还没有壁纸文件，上传一张图片（≤24MB）或视频（≤96MB）开始。'),
-          bgActive ? React.createElement('div', { className: 'tg-bkgBody' },
-            bgSlider('背景模糊', bgCfg.blur || 0, 0, 40, 1, 'px', function (v) { bgSave({ blur: v }) }),
-            bgSlider('背景压暗', bgCfg.dim || 0, 0, 0.8, 0.05, '', function (v) { bgSave({ dim: v }) }),
-            bgSlider('磨砂强度', bgCfg.glass || 0, 0, 24, 1, 'px', function (v) { bgSave({ glass: v }) }),
-            bgSlider('列不透明度', bgCfg.containerAlpha == null ? 84 : bgCfg.containerAlpha, 40, 100, 1, '%', function (v) { bgSave({ containerAlpha: v }) }),
-            bgSlider('内容不透明度', bgCfg.centerAlpha == null ? 92 : bgCfg.centerAlpha, 60, 100, 1, '%', function (v) { bgSave({ centerAlpha: v }) }),
-            React.createElement('span', { className: 'tg-head' }, '背景垫 body 底层，侧栏/详情/中列半透明浮于其上；磨砂走伪元素，不影响弹窗定位。')) : null)
-
-
         /* 顶部简单配置区：圆角 + 回到官方（取色已独立成区，当前主题下沉到列表头 now 条） */
         const topbar = React.createElement('div', { className: 'tg-topbar' },
           React.createElement('div', { className: 'tg-ctl' },
@@ -952,7 +789,6 @@ window.__ModuleLoader__.load({
         /* 简单配置在前，壁纸取色居中，主题色列表（最后一项）在后 */
         return React.createElement('div', { className: 'tg-page' },
           topbar,
-          bkgSection,
           wallSection,
           React.createElement('div', { className: 'tg-list' },
             nowStrip,
@@ -1089,8 +925,7 @@ window.__ModuleLoader__.load({
       }
 
       /* 启动恢复：读 settings 持久化的 themeId 重建覆盖层；壁纸 MD3 从持久化
-       * seed（= photoPalette.accent，兼容旧数据）重建 token；同时恢复全局圆角
-       * 与背景管线（背景层 + 容器磨砂覆盖）。 */
+       * seed（= photoPalette.accent，兼容旧数据）重建 token；同时恢复全局圆角。 */
       const bridge = createBridge()
       bridge.state().then(function (reply) {
         if (reply && reply.ok === true) {
@@ -1103,20 +938,15 @@ window.__ModuleLoader__.load({
           if (saved.length > 0) applyThemeChoice(saved)
           applyRadius(reply.radius)
           desiredRadius = reply.radius && typeof reply.radius.global === 'number' ? reply.radius.global : -1
-          applyBackground(reply.background)
         }
       }).catch(function (e) {
         console.log('[dshp-inx-custom-ui] 读取持久化配置失败: ' + String((e && e.message) || e))
       })
 
-      /* 插件停止时清覆盖层与背景层（ctx.effect 自动收回）。 */
+      /* 插件停止时清覆盖层（ctx.effect 自动收回）。 */
       ctx.effect(function () {
         return function () {
           if (overrideDispose) { try { overrideDispose() } catch (e) { /* 进程停止，忽略 */ } overrideDispose = null }
-          const bgLayer = document.getElementById('dshp-inx-custom-ui-bg-layer')
-          if (bgLayer) bgLayer.remove()
-          const bgCss = document.getElementById('dshp-inx-custom-ui-bg-css')
-          if (bgCss) bgCss.remove()
         }
       }, 'custom-ui: override teardown')
 
@@ -1159,102 +989,6 @@ window.__ModuleLoader__.load({
         style.textContent = css.join('\n')
         document.head.appendChild(style)
       }
-    }
-
-
-    /* ── 背景管线：壁纸层 + 容器透明化/磨砂覆盖层 ──
-     * 社区通行方案（BetterDiscord Translucence 的 --app-bg + layers 磨砂、
-     * Obsidian workspace background snippet 的容器降透明）在 DSH 的落地：
-     *
-     * 分层（z-index 升序）：
-     *   body 背景   → 主题 --dsw-alias-bg-base（官方 body 规则持有，不动）
-     *   #bg-layer   → fixed 全屏壁纸（图/视频，blur/dim 滤镜吃在层上）
-     *   #root       → 三列 frame（grid，原位）—— 官方 frame 背景
-     *                 --dsw-alias-bg-base 改为半透明，壁纸透出
-     *   各列        → ::before 磨砂伪元素（glass>0 时 backdrop-filter），
-     *                 绝不能把 backdrop-filter 放在列自身 —— 列内 fixed
-     *                 浮层（设置 dialog .VOzbGW_overlay）会以列为包含块
-     *                 被压塌（历史翻车 a3fd708）。
-     *
-     * 伪元素不构成 fixed 后代的包含块，磨砂安全；同时列自身 background
-     * 保持 transparent（原 token 交给 ::before 上色），实现社区主题同款
-     * 「背景图 + 磨砂浮层」观感。设置面板/菜单（--dsw-specific-menu/
-     * bg-overlay）不透明，浮在最上不受影响。 */
-    const BG_LAYER_ID = 'dshp-inx-custom-ui-bg-layer'
-    const BG_CSS_ID = 'dshp-inx-custom-ui-bg-css'
-    const DEFAULT_BG = { type: 'none', file: '', blur: 0, dim: 0, glass: 0, containerAlpha: 84, centerAlpha: 92 }
-
-    /** 渲染背景（幂等）：none = 拆层回官方。cfg 来自 Host state.background。 */
-    function applyBackground(cfg) {
-      const bg = cfg && typeof cfg === 'object' ? Object.assign({}, DEFAULT_BG, cfg) : DEFAULT_BG
-      const oldLayer = document.getElementById(BG_LAYER_ID)
-      if (oldLayer) oldLayer.remove()
-      const oldCss = document.getElementById(BG_CSS_ID)
-      if (oldCss) oldCss.remove()
-
-      const active = (bg.type === 'image' || bg.type === 'video') && typeof bg.file === 'string' && bg.file.length > 0
-      if (!active) return
-
-      const blurPx = Math.min(40, Math.max(0, Number(bg.blur) || 0))
-      const dimPct = Math.min(0.8, Math.max(0, Number(bg.dim) || 0))
-      const glassPx = Math.min(24, Math.max(0, Math.round(Number(bg.glass) || 0)))
-      const containerAlpha = Math.min(100, Math.max(40, Math.round(Number(bg.containerAlpha) || 84)))
-      const centerAlpha = Math.min(100, Math.max(60, Math.round(Number(bg.centerAlpha) || 92)))
-      const src = 'url("/ext/dshp-inx-custom-ui/file/' + encodeURIComponent(bg.file) + '")'
-
-      /* 壁纸层：fixed 垫底。blur 会露边缘 → 等比放大；dim 吃在 opacity。 */
-      const layer = document.createElement('div')
-      layer.id = BG_LAYER_ID
-      layer.setAttribute('aria-hidden', 'true')
-      const scale = blurPx > 0 ? 1 + Math.min(0.2, Math.ceil(blurPx / 20) / 10) : 1
-      layer.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;'
-        + 'transform:scale(' + scale + ')'
-        + (blurPx > 0 ? ';filter:blur(' + blurPx + 'px)' : '')
-      if (bg.type === 'image') {
-        const dimWrap = document.createElement('div')
-        dimWrap.style.cssText = 'position:absolute;inset:0;background-image:' + src + ';background-size:cover;background-position:center;background-repeat:no-repeat' + (dimPct > 0 ? ';opacity:' + (1 - dimPct) + ';background-color:#000' : '')
-        layer.appendChild(dimWrap)
-      } else {
-        /* 动态壁纸：内嵌静音循环视频，同样吃 dim */
-        const video = document.createElement('video')
-        video.autoplay = true
-        video.loop = true
-        video.muted = true
-        video.playsInline = true
-        video.setAttribute('playsinline', '')
-        video.setAttribute('disablepictureinpicture', '')
-        video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover' + (dimPct > 0 ? ';opacity:' + (1 - dimPct) : '')
-        video.src = '/ext/dshp-inx-custom-ui/file/' + encodeURIComponent(bg.file)
-        layer.appendChild(video)
-      }
-      document.body.prepend(layer)
-
-      /* 覆盖层样式：frame 半透明 + 各列伪元素磨砂。
-       * color-mix 第二分量是百分比（62%），传小数会让整条声明非法（历史坑）。
-       * frame 是 #root 直下 grid 容器（.pI_x6G_frame）；选择器不强绑 hash，
-       * 用 [class*="_frame"] 语义命中，漂移风险低。 */
-      const mix = (token, pct) => 'color-mix(in srgb, ' + token + ' ' + pct + '%, transparent)'
-      const glassCss = glassPx > 0 ? 'backdrop-filter:blur(' + glassPx + 'px) saturate(1.15);-webkit-backdrop-filter:blur(' + glassPx + 'px) saturate(1.15);' : ''
-      const css = [
-        'body{background:var(--dsw-alias-bg-base) !important}',
-        '#root>[class*="_frame"]{background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + ' !important}',
-        /* 侧栏列（.pI_x6G_sidebarCol）：sidebar-fill 半透明 + 磨砂伪元素 */
-        '#root [class*="_sidebarCol"]{position:relative;background:transparent !important}',
-        '#root [class*="_sidebarCol"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
-          + glassCss + 'background:' + mix('var(--dsw-specific-sidebar-fill)', containerAlpha) + '}',
-        /* 详情列（.pI_x6G_detailsCol）：bg-layer-1 半透明 + 磨砂 */
-        '#root [class*="_detailsCol"]{position:relative;background:transparent !important}',
-        '#root [class*="_detailsCol"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
-          + glassCss + 'background:' + mix('var(--dsw-alias-bg-layer-1)', containerAlpha) + '}',
-        /* 中列（.pI_x6G_centerCol）：本身无背景 token，给浅覆盖保气泡可读 */
-        '#root [class*="_centerCol"]{position:relative}',
-        '#root [class*="_centerCol"]::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;'
-          + 'background:' + mix('var(--dsw-alias-bg-base)', centerAlpha) + '}'
-      ]
-      const style = document.createElement('style')
-      style.id = BG_CSS_ID
-      style.textContent = css.join('\n')
-      document.head.appendChild(style)
     }
 
 
