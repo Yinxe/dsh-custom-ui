@@ -40,8 +40,7 @@ dsh-custom-ui/
 ├── package.json          # @dshp-inx/custom-ui，dsh.client 声明
 ├── cordis.patch.yml       # bundle 挂载行
 ├── lib/
-│   ├── index.js           # Host 半：settings 持久化 + 同源路由（state/themes/theme/config）+ 主题 allowlist（动态派生自目录）
-│   ├── shared.js          # Host 三件套（settingsNamespace/json/sameOrigin/readBody，六插件逐字相同）
+│   ├── index.js           # Host 半：顶部同源小工具（settingsNamespace/json/sameOrigin/readBody，本包自有）+ settings 持久化 + 同源路由（state/themes/theme/config）+ 主题 allowlist（动态派生自目录）
 │   └── themes/
 │       ├── index.js       # 主题目录聚合（THEME_CATALOG）
 │       ├── shared.js      # 字体栈常量 + 字体 token 批量填充 + FLAT_SHADOWS

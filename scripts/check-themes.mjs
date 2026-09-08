@@ -16,7 +16,6 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = dirname(here)
 const { THEME_CATALOG, THEME_IDS } = await import('../lib/themes/index.js')
-const { settingsNamespace } = await import('../lib/shared.js')
 
 let fail = 0
 const bad = (msg) => { fail++; console.error('FAIL ' + msg) }
@@ -64,8 +63,9 @@ for (const m of clientEntries) {
   if (!THEME_IDS.includes(m[1])) bad('client 多余条目：' + m[1])
 }
 
-// 4. settingsNamespace 仍可用（0.1.2-rc.1 内联版）
-try { settingsNamespace('dshp-inx-custom-ui') } catch (e) { bad('settingsNamespace 异常') }
+// 4. settings 命名空间：Host 半自带 kebab-case 校验（各插件 lib/index.js 顶部独立持有）
+if (!hostSrc.includes("settingsNamespace('dshp-inx-custom-ui')")) bad('Host 缺 settings 命名空间注册')
+if (!hostSrc.includes('NAMESPACE_PATTERN')) bad('Host 缺命名空间 kebab-case 校验')
 
 if (fail > 0) { console.error(`\n${fail} 项不一致`); process.exit(1) }
 console.log('三处一致 ✓')

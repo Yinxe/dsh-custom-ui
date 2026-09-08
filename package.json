@@ -1,6 +1,6 @@
 {
   "name": "@dshp-inx/custom-ui",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Custom UI suite for DeepSeek Harness: theme gallery is the first module (23 themes with ~121 full token mappings each); future modules (fonts, layout, interactions) will live here too.",
